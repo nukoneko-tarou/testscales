@@ -126,7 +126,7 @@ const UNIT_INDICATORS = [
 ];
 
 const TEST_CASE_PATTERNS = [
-  /(?:^|\n|\s)\b(?:it|test|describe\.each|test\.each)\s*(?:\.(?:only|skip|todo|concurrent|each))?\s*\(/g,
+  /(?:^|\n|\s)\b(?:it|test|describe\.each|test\.each)\s*(?:\.(?:only|skip|todo|concurrent|each))?\s*[(`]/g, // Jest / Vitest, including .each tagged templates
   /(?:^|\n)\s*def\s+test_[a-zA-Z0-9_]+\b/g, // Python pytest / Ruby test-unit
   /(?:^|\n)\s*func\s+Test[a-zA-Z0-9_]+\s*\(/g, // Go test
   /#\[test\]/g, // Rust test

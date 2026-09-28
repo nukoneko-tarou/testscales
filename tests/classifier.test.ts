@@ -22,6 +22,22 @@ describe("countTestCases", () => {
     expect(countTestCases(feature)).toBe(2);
   });
 
+  it("counts .each tables written as tagged templates", () => {
+    const code = `
+      describe('isFeatureEnabled', () => {
+        it.each\`
+          flag       | expected
+          \${'on'}    | \${true}
+          \${'off'}   | \${false}
+        \`('returns $expected for $flag', ({ flag, expected }) => {
+          expect(isFeatureEnabled(flag)).toBe(expected)
+        })
+        test.each([[1, 1]])('adds %i', (a, b) => {})
+      })
+    `;
+    expect(countTestCases(code)).toBe(2);
+  });
+
   it("counts Gherkin scenarios written as Markdown headings in Japanese", () => {
     const featureMd = `
       # フィーチャー: カンファレンス申し込み
