@@ -184,7 +184,16 @@ export function determineArchetype(
   const intPct = (integration.weight / dynamicTotal) * 100;
   const e2ePct = (e2e.weight / dynamicTotal) * 100;
 
-  // 2. Hourglass: Both Unit and E2E are prominent, but Integration is pinched out (<= 15%)
+  // 2. Monolith Spike: One layer stands alone while both other dynamic layers are practically absent (< 2%)
+  const secondLargestPct = [unitPct, intPct, e2ePct].sort((a, b) => b - a)[1] ?? 0;
+  if (secondLargestPct < 2) {
+    return {
+      type: "monolith-spike",
+      ...ARCHETYPES["monolith-spike"],
+    };
+  }
+
+  // 3. Hourglass: Both Unit and E2E are prominent, but Integration is pinched out (<= 15%)
   if (unitPct >= 20 && e2ePct >= 20 && intPct <= 15) {
     return {
       type: "hourglass",
@@ -192,7 +201,7 @@ export function determineArchetype(
     };
   }
 
-  // 3. Ice Cream Cone: E2E is heavily top-heavy (>= 35%) while Unit is weak (<= 30%)
+  // 4. Ice Cream Cone: E2E is heavily top-heavy (>= 35%) while Unit is weak (<= 30%)
   if (e2ePct >= 35 && e2ePct > intPct && unitPct <= 30) {
     return {
       type: "ice-cream-cone",
@@ -200,21 +209,12 @@ export function determineArchetype(
     };
   }
 
-  // 4. Classic Pyramid: Unit is the foundation bedrock (Unit > Integration >= E2E, Unit >= 45%)
+  // 5. Classic Pyramid: Unit is the foundation bedrock (Unit > Integration >= E2E, Unit >= 45%)
   // Preserving the tiered triangle hierarchy is the purest Classic Pyramid, even with wide 80%+ base.
   if (unitPct >= 45 && unitPct > intPct && intPct >= e2ePct) {
     return {
       type: "pyramid",
       ...ARCHETYPES.pyramid,
-    };
-  }
-
-  // 5. Monolith Spike: One layer stands alone while both other dynamic layers are practically absent (< 2%)
-  const secondLargestPct = [unitPct, intPct, e2ePct].sort((a, b) => b - a)[1] ?? 0;
-  if (secondLargestPct < 2) {
-    return {
-      type: "monolith-spike",
-      ...ARCHETYPES["monolith-spike"],
     };
   }
 

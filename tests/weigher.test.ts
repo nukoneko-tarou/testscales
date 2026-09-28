@@ -124,7 +124,7 @@ describe("determineArchetype", () => {
         filePath: "calc.test.ts",
         language: "TypeScript",
         layer: "unit",
-        testCaseCount: 2,
+        testCaseCount: 5,
         linesOfCode: 20,
         reasons: [],
       },
@@ -466,6 +466,18 @@ describe("determineArchetype with a thin unit tier", () => {
 
     const verdict = determineArchetype(stats, records.length);
     expect(verdict.type).toBe("trophy");
+  });
+
+  it("detects Monolith Spike for a suite that lives in a single layer, whichever layer it is", () => {
+    const e2eOnly = [record("e2e", 43)];
+    expect(determineArchetype(weighLayers(e2eOnly, staticTools), e2eOnly.length).type).toBe(
+      "monolith-spike",
+    );
+
+    const unitOnly = [record("unit", 300)];
+    expect(determineArchetype(weighLayers(unitOnly, staticTools), unitOnly.length).type).toBe(
+      "monolith-spike",
+    );
   });
 
   it("detects Monolith Spike only when the other dynamic layers are practically absent", () => {
