@@ -109,3 +109,29 @@ describe("renderLiveSilhouette", () => {
     expect(spikeLines.join("\n")).toContain("··");
   });
 });
+
+describe("renderLiveSilhouette static layer detail", () => {
+  const stat = (layer: TestLayer, fileCount: number): LayerStats => ({
+    layer,
+    percentage: 25,
+    fileCount,
+    testCaseCount: fileCount,
+    linesOfCode: 0,
+    weight: 25,
+  });
+  const layers: Record<TestLayer, LayerStats> = {
+    e2e: stat("e2e", 1),
+    integration: stat("integration", 1),
+    unit: stat("unit", 1),
+    static: stat("static", 256),
+  };
+
+  it("reports the whole static count as configs when tool count is unknown", () => {
+    expect(renderLiveSilhouette(layers, "pyramid").join("\n")).toContain("256 config(s)");
+  });
+
+  it("splits static files into configs and play-less stories", () => {
+    const text = renderLiveSilhouette(layers, "pyramid", 8, 3).join("\n");
+    expect(text).toContain("3 config(s), 253 stories");
+  });
+});

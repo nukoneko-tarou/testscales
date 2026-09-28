@@ -53,10 +53,18 @@ const ARCHETYPE_ICONS: Record<Exclude<ArchetypeType, "void">, Record<TestLayer, 
   },
 };
 
+function describeStaticLayer(fileCount: number, staticToolCount?: number): string {
+  if (staticToolCount === undefined || staticToolCount >= fileCount) {
+    return `${fileCount} config(s)`;
+  }
+  return `${staticToolCount} config(s), ${fileCount - staticToolCount} stories`;
+}
+
 export function renderLiveSilhouette(
   layers: Record<TestLayer, LayerStats>,
   archetypeType: ArchetypeType = "pyramid",
   gaugeLen = 8,
+  staticToolCount?: number,
 ): string[] {
   const layerOrder: TestLayer[] = ["e2e", "integration", "unit", "static"];
   const lines: string[] = [];
@@ -98,7 +106,7 @@ export function renderLiveSilhouette(
     const pctStr = `${pct}%`.padStart(4, " ");
     const detail =
       layer === "static"
-        ? `${stat.fileCount} config(s)`
+        ? describeStaticLayer(stat.fileCount, staticToolCount)
         : `${stat.fileCount} files, ${stat.testCaseCount} tests`;
 
     lines.push(
@@ -169,7 +177,7 @@ export function renderTerminalReport(result: ScaleResult): string {
   if (verdict.type === "void") {
     lines.push(pc.yellow(verdict.asciiArt.trimEnd()));
   } else {
-    const silhouetteLines = renderLiveSilhouette(layers, verdict.type);
+    const silhouetteLines = renderLiveSilhouette(layers, verdict.type, 8, staticTools.length);
     for (const s of silhouetteLines) {
       lines.push(s);
     }
