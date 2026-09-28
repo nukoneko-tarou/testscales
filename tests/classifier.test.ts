@@ -22,6 +22,21 @@ describe("countTestCases", () => {
     expect(countTestCases(feature)).toBe(2);
   });
 
+  it("counts Gherkin scenarios written as Markdown headings in Japanese", () => {
+    const featureMd = `
+      # フィーチャー: カンファレンス申し込み
+
+      ## ルール: 申し込み後にメールが届く
+
+      ### シナリオ: フォームから申し込む
+      * 前提 申し込みページを開く
+
+      ### シナリオアウトライン: 招待コードで申し込む
+      * 前提 招待コード <code> を入力する
+    `;
+    expect(countTestCases(featureMd)).toBe(2);
+  });
+
   it("counts assertion calls when no test blocks are present", () => {
     const script = `
       const assert = require('assert')
@@ -44,6 +59,13 @@ describe("classifyFile with .spec and naming patterns", () => {
     expect(classifyFile("components/modal.integration.spec.tsx", "").layer).toBe("integration");
     expect(classifyFile("components/card.component.spec.tsx", "").layer).toBe("integration");
     expect(classifyFile("specs/integration/api.spec.ts", "").layer).toBe("integration");
+  });
+
+  it("recognizes Cucumber Markdown features as E2E", () => {
+    const res = classifyFile("src/features/signup/signup.feature.md", "### シナリオ: 申し込む");
+    expect(res.layer).toBe("e2e");
+    expect(res.language).toBe("Cucumber");
+    expect(res.testCaseCount).toBe(1);
   });
 
   it("recognizes Cypress .cy.ts and cypress directories", () => {

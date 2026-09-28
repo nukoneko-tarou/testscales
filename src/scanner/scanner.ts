@@ -56,6 +56,7 @@ export const TEST_FILE_PATTERNS = [
   "**/*[-._]{test,spec}*.php",
   "**/test_*.php",
   "**/*.feature",
+  "**/*.feature.md",
 ];
 
 const TEST_IGNORE_REGEX =
@@ -76,7 +77,7 @@ const TEST_FILE_REGEX = new RegExp(
     `[._-](?:test|spec|cy|stories)(?:\\.[a-zA-Z0-9_-]+)*\\.(?:[jt]sx?|mjs|cjs)|` +
     `(?:^|\\/)__tests__\\/.*(?<!\\.d)\\.(?:[jt]sx?|mjs|cjs)|` +
     // 6. Special test DSLs / BDD / Rust
-    `\\.feature|` +
+    `\\.feature(?:\\.md)?|` +
     `[._-]test\\.rs` +
     `)$`,
   "i",

@@ -80,4 +80,17 @@ describe("scanRepository file discovery", () => {
     const viaGit = await scanRepository(tempDir);
     expect(viaGit.records.map((r) => r.filePath).sort()).toEqual(expected);
   });
+
+  it("discovers Cucumber Markdown feature files", async () => {
+    mkdirSync(join(tempDir, "src/features/signup"), { recursive: true });
+    writeFileSync(join(tempDir, "src/features/signup/signup.feature.md"), `### シナリオ: 申し込む`);
+    const expected = ["src/features/signup/signup.feature.md", "sum.test.ts"];
+
+    const viaGlob = await scanRepository(tempDir);
+    expect(viaGlob.records.map((r) => r.filePath).sort()).toEqual(expected);
+
+    execFileSync("git", ["init", "-q"], { cwd: tempDir });
+    const viaGit = await scanRepository(tempDir);
+    expect(viaGit.records.map((r) => r.filePath).sort()).toEqual(expected);
+  });
 });

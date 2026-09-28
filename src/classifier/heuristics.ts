@@ -21,6 +21,7 @@ export interface ClassifyResult {
 }
 
 export function detectFileLanguage(filePath: string): string {
+  if (filePath.toLowerCase().endsWith(".feature.md")) return "Cucumber";
   const dotIndex = filePath.lastIndexOf(".");
   if (dotIndex === -1) return "Other";
   const ext = filePath.slice(dotIndex).toLowerCase();
@@ -55,7 +56,7 @@ export function detectFileLanguage(filePath: string): string {
 
 // 1. Path Regex Patterns
 const E2E_PATH_REGEX =
-  /(?:^|\/)(?:e2e|cypress|playwright|tests?\/e2e|specs?\/e2e|specs?\/smoke|tests?\/smoke)(?:\/|$)|(?:\.|\/)(?:e2e|system|smoke)[._-](?:test|spec)\.[a-zA-Z0-9]+$|\.cy\.[a-zA-Z0-9]+$|\.feature$/i;
+  /(?:^|\/)(?:e2e|cypress|playwright|tests?\/e2e|specs?\/e2e|specs?\/smoke|tests?\/smoke)(?:\/|$)|(?:\.|\/)(?:e2e|system|smoke)[._-](?:test|spec)\.[a-zA-Z0-9]+$|\.cy\.[a-zA-Z0-9]+$|\.feature(?:\.md)?$/i;
 
 const INTEGRATION_PATH_REGEX =
   /(?:^|\/)(?:integration|int|tests?\/integration|specs?\/integration|contract)(?:\/|$)|(?:\.|\/)(?:integration|int|component|contract|api)[._-](?:test|spec)\.[a-zA-Z0-9]+$/i;
@@ -129,7 +130,7 @@ const TEST_CASE_PATTERNS = [
   /(?:^|\n)\s*def\s+test_[a-zA-Z0-9_]+\b/g, // Python pytest / Ruby test-unit
   /(?:^|\n)\s*func\s+Test[a-zA-Z0-9_]+\s*\(/g, // Go test
   /#\[test\]/g, // Rust test
-  /(?:^|\n)\s*Scenario(?:\s+Outline)?\s*:/g, // Cucumber feature scenario
+  /(?:^|\n)\s*(?:#{1,6}\s*)?(?:Scenario(?:\s+Outline|\s+Template)?|シナリオ(?:アウトライン|テンプレート)?)\s*:/g, // Gherkin scenario (en/ja), plain or Markdown heading
   /(?:^|\n)\s*(?:it|specify|scenario)\s+['"][^'"]+['"]\s+do\b/g, // Ruby RSpec
   /(?:^|\n)\s*(?:public\s+)?function\s+test[a-zA-Z0-9_]+\s*\(/g, // PHPUnit test methods
   /(?:^|\n)\s*#\[(?:\\PHPUnit\\Framework\\Attributes\\)?Test\]/g, // PHP 8 test attributes
