@@ -23,25 +23,7 @@ export function calculateStaticCoverage(
     return 0;
   }
 
-  // 1. Detect language context from records and tools
-  const detectedLangs = new Set<string>();
-  for (const r of records) {
-    if (r.language) detectedLangs.add(r.language.toLowerCase());
-  }
-  for (const t of staticTools) {
-    const nameLower = t.name.toLowerCase();
-    if (nameLower.includes("go")) detectedLangs.add("go");
-    if (nameLower.includes("rust")) detectedLangs.add("rust");
-    if (nameLower.includes("typescript")) detectedLangs.add("typescript");
-    if (["mypy", "pyright", "ruff", "flake8"].some((k) => nameLower.includes(k))) {
-      detectedLangs.add("python");
-    }
-    if (["rubocop", "sorbet", "steep"].some((k) => nameLower.includes(k))) {
-      detectedLangs.add("ruby");
-    }
-  }
-
-  // 2. Identify 3 pillars of static defense
+  // 1. Identify 3 pillars of static defense
   // A. Type Safety
   const hasNativeCompiler = staticTools.some(
     (t) =>
@@ -81,9 +63,6 @@ export function calculateStaticCoverage(
     const typedRatio = Math.max(0, Math.min(1.0, options.typedRatio ?? 1.0));
     const base = isStrict ? 40 : 30;
     typeScore = Math.round(base * (0.4 + 0.6 * typedRatio));
-  } else if (detectedLangs.has("ruby") && staticTools.some((t) => t.name === "RuboCop")) {
-    // Ruby standard ecosystem: RuboCop performs comprehensive AST pattern & safety analysis
-    typeScore = 40;
   }
 
   // Linter scoring (max 35)

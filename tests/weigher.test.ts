@@ -389,21 +389,27 @@ describe("determineArchetype", () => {
     );
     expect(pyStats.static.percentage).toBe(100);
 
-    // 4. Ruby full defense: RuboCop de-facto comprehensive static analysis
-    const rbStats = weighLayers(
-      [
-        {
-          filePath: "spec/core_spec.rb",
-          language: "Ruby",
-          layer: "unit",
-          testCaseCount: 10,
-          linesOfCode: 50,
-          reasons: [],
-        },
-      ],
-      [{ name: "RuboCop", category: "linter", configFile: ".rubocop.yml" }],
-    );
-    expect(rbStats.static.percentage).toBe(100);
+    // 4. Ruby: RuboCop covers lint + format, type safety needs Sorbet or Steep
+    const rubyRecords: TestFileRecord[] = [
+      {
+        filePath: "spec/core_spec.rb",
+        language: "Ruby",
+        layer: "unit",
+        testCaseCount: 10,
+        linesOfCode: 50,
+        reasons: [],
+      },
+    ];
+    const rubocopOnly = weighLayers(rubyRecords, [
+      { name: "RuboCop", category: "linter", configFile: ".rubocop.yml" },
+    ]);
+    expect(rubocopOnly.static.percentage).toBe(60);
+
+    const rubocopWithSorbet = weighLayers(rubyRecords, [
+      { name: "RuboCop", category: "linter", configFile: ".rubocop.yml" },
+      { name: "Sorbet", category: "typechecker", configFile: "sorbet/config", isStrict: true },
+    ]);
+    expect(rubocopWithSorbet.static.percentage).toBe(100);
   });
 
   it("divides dynamic tests cleanly to 100% total regardless of static score", () => {
