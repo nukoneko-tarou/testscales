@@ -31,7 +31,8 @@ describe("scanRepository file discovery", () => {
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), "testscales-scanner-"));
-    writeFileSync(join(tempDir, "test-setup.ts"), `import '@testing-library/jest-dom/vitest'`);
+    mkdirSync(join(tempDir, "test"), { recursive: true });
+    writeFileSync(join(tempDir, "test/test-setup.ts"), `import '@testing-library/jest-dom/vitest'`);
     writeFileSync(join(tempDir, "sum.test.ts"), `it('adds', () => { expect(1 + 1).toBe(2) })`);
   });
 
@@ -56,6 +57,21 @@ describe("scanRepository file discovery", () => {
     writeFileSync(join(tempDir, "src/common/format.test.ts"), `it('formats', () => {})`);
     writeFileSync(join(tempDir, "test/common/test-helper.js"), `module.exports = {}`);
     const expected = ["src/common/format.test.ts", "sum.test.ts"];
+
+    const viaGlob = await scanRepository(tempDir);
+    expect(viaGlob.records.map((r) => r.filePath).sort()).toEqual(expected);
+
+    execFileSync("git", ["init", "-q"], { cwd: tempDir });
+    const viaGit = await scanRepository(tempDir);
+    expect(viaGit.records.map((r) => r.filePath).sort()).toEqual(expected);
+  });
+
+  it("applies the test-* prefix convention only inside test directories", async () => {
+    mkdirSync(join(tempDir, "src/support"), { recursive: true });
+    mkdirSync(join(tempDir, "test/parallel"), { recursive: true });
+    writeFileSync(join(tempDir, "src/support/test-services.ts"), `it('boots', () => {})`);
+    writeFileSync(join(tempDir, "test/parallel/test-fs.js"), `it('reads', () => {})`);
+    const expected = ["sum.test.ts", "test/parallel/test-fs.js"];
 
     const viaGlob = await scanRepository(tempDir);
     expect(viaGlob.records.map((r) => r.filePath).sort()).toEqual(expected);

@@ -43,7 +43,8 @@ export const DEFAULT_IGNORE_PATTERNS = [
 
 export const TEST_FILE_PATTERNS = [
   "**/*[-._]{test,spec}*.{js,jsx,ts,tsx,mjs,cjs}",
-  "**/{test,spec}[-_]*.{js,jsx,ts,tsx,mjs,cjs}",
+  "**/test/**/{test,spec}[-_]*.{js,jsx,ts,tsx,mjs,cjs}",
+  "**/tests/**/{test,spec}[-_]*.{js,jsx,ts,tsx,mjs,cjs}",
   "**/__tests__/**/*.{js,jsx,ts,tsx,mjs,cjs}",
   "**/*.cy.{js,jsx,ts,tsx}",
   "**/*.stories.{js,jsx,ts,tsx}",
@@ -70,8 +71,8 @@ const TEST_FILE_REGEX = new RegExp(
     `(?:^|\\/)test_[a-zA-Z0-9_]+\\.py|[a-zA-Z0-9_]+_test\\.py|` +
     // 4. PHP: PHPUnit (*Test.php), Pest (*.test.php, *.spec.php), and test_*.php
     `[a-zA-Z0-9_]+Test\\.php|[a-zA-Z0-9_]+[._-](?:test|spec)\\.php|(?:^|\\/)test_[a-zA-Z0-9_]+\\.php|` +
-    // 5. JS/TS: prefix (test-*, spec-*), suffix/infix (*.test.*, *-test.*, *.spec.*, etc.), and __tests__/
-    `(?:^|\\/)(?:test|spec)[-_][a-zA-Z0-9_-]+(?:\\.[a-zA-Z0-9_-]+)*\\.(?:[jt]sx?|mjs|cjs)|` +
+    // 5. JS/TS: prefix (test-*, spec-*) inside test/ or tests/ (Node.js core layout), suffix/infix (*.test.*, *-test.*, *.spec.*, etc.), and __tests__/
+    `(?:^|\\/)tests?\\/(?:[^\\/]+\\/)*(?:test|spec)[-_][a-zA-Z0-9_-]+(?:\\.[a-zA-Z0-9_-]+)*\\.(?:[jt]sx?|mjs|cjs)|` +
     `[._-](?:test|spec|cy|stories)(?:\\.[a-zA-Z0-9_-]+)*\\.(?:[jt]sx?|mjs|cjs)|` +
     `(?:^|\\/)__tests__\\/.*(?<!\\.d)\\.(?:[jt]sx?|mjs|cjs)|` +
     // 6. Special test DSLs / BDD / Rust
