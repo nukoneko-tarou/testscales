@@ -108,7 +108,10 @@ const INTEGRATION_INDICATORS = [
       /(?:^|\n)\s*(?:import\b[\s\S]*?from\s+['"]@pact-foundation\/pact['"]|const\b[\s\S]*?=\s*require\(['"]@pact-foundation\/pact['"]\))/i,
     reason: "Pact contract testing import",
   },
-  { pattern: /\brender\s*\(|<[A-Z][a-zA-Z0-9]*\s*\/?>/i, reason: "Component DOM rendering API" },
+  {
+    pattern: /\brender\s*\(|<[A-Za-z][A-Za-z0-9]*(?:\s[^<>]*)?\/>|<\/[A-Za-z][A-Za-z0-9]*>/i,
+    reason: "Component DOM rendering API",
+  },
   { pattern: /\bscreen\.(?:getBy|findBy|queryBy)[A-Za-z]+\s*\(/i, reason: "DOM screen queries" },
 ];
 

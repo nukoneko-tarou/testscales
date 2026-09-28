@@ -94,3 +94,35 @@ describe("classifyFile with .spec and naming patterns", () => {
     expect(res.layer).toBe("unit");
   });
 });
+
+describe("classifyFile JSX detection", () => {
+  it("does not mistake TypeScript generics for component rendering", () => {
+    const res = classifyFile(
+      "src/models/form.spec.ts",
+      `
+      const values: Array<FormValues> = []
+      const ctx = createContext<ToolContext>(null)
+      it('parses form values', () => {
+        expect(parse<FormValues>(values)).toEqual([])
+      })
+    `,
+    );
+    expect(res.layer).toBe("unit");
+    expect(res.reasons).not.toContain("Component DOM rendering API");
+  });
+
+  it("recognizes self-closing and paired JSX elements as component rendering", () => {
+    const selfClosing = classifyFile(
+      "src/card.test.tsx",
+      `it('mounts', () => { mount(<Card title="hello" />) })`,
+    );
+    expect(selfClosing.layer).toBe("integration");
+    expect(selfClosing.reasons).toContain("Component DOM rendering API");
+
+    const paired = classifyFile(
+      "src/card.test.tsx",
+      `it('mounts', () => { mount(<Card>hi</Card>) })`,
+    );
+    expect(paired.layer).toBe("integration");
+  });
+});
