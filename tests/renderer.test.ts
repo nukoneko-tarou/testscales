@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@rstest/core";
-import { renderLiveSilhouette } from "../src/renderer/terminal.js";
+import { evaluateScale } from "../src/judge/weigher.js";
+import { renderLiveSilhouette, renderTerminalReport } from "../src/renderer/terminal.js";
 import type { LayerStats, TestLayer } from "../src/types.js";
 
 describe("renderLiveSilhouette", () => {
@@ -133,5 +134,18 @@ describe("renderLiveSilhouette static layer detail", () => {
   it("splits static files into configs and play-less stories", () => {
     const text = renderLiveSilhouette(layers, "pyramid", 8, 3).join("\n");
     expect(text).toContain("3 config(s), 253 stories");
+  });
+});
+
+describe("renderTerminalReport for repositories without tests", () => {
+  it("explains a Void verdict when the repository has no source files", () => {
+    const result = evaluateScale("/docs-repo", [], [], 5, { codeFileCount: 0 });
+    expect(result.verdict.type).toBe("void");
+    expect(renderTerminalReport(result)).toContain("nothing to weigh");
+  });
+
+  it("keeps the plain Void verdict when source files exist", () => {
+    const result = evaluateScale("/app", [], [], 5, { codeFileCount: 12 });
+    expect(renderTerminalReport(result)).not.toContain("nothing to weigh");
   });
 });

@@ -86,6 +86,7 @@ const TEST_FILE_REGEX = new RegExp(
 interface GitDiscoveryResult {
   testFiles: string[];
   typedRatio: number;
+  codeFileCount: number;
 }
 
 /**
@@ -145,7 +146,7 @@ async function discoverFilesViaGit(rootDir: string): Promise<GitDiscoveryResult 
     }
 
     const typedRatio = totalCodeFiles > 0 ? typedCodeFiles / totalCodeFiles : 1.0;
-    return { testFiles, typedRatio };
+    return { testFiles, typedRatio, codeFileCount: totalCodeFiles };
   } catch {
     return null;
   }
@@ -187,6 +188,7 @@ export interface ScanResult {
   records: TestFileRecord[];
   scannedFilesCount: number;
   typedRatio: number;
+  codeFileCount?: number;
 }
 
 async function processTestFile(
@@ -237,6 +239,7 @@ export async function scanRepository(
 ): Promise<ScanResult> {
   let uniqueFiles: string[] = [];
   let typedRatio = 1.0;
+  let codeFileCount: number | undefined;
 
   // 1. Try Git Index Fast-Track first (10x faster on monorepos)
   if (customIgnore.length === 0) {
@@ -244,6 +247,7 @@ export async function scanRepository(
     if (gitResult !== null) {
       uniqueFiles = gitResult.testFiles;
       typedRatio = gitResult.typedRatio;
+      codeFileCount = gitResult.codeFileCount;
     }
   }
 
@@ -268,5 +272,6 @@ export async function scanRepository(
     records,
     scannedFilesCount: records.length,
     typedRatio,
+    ...(codeFileCount !== undefined ? { codeFileCount } : {}),
   };
 }

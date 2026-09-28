@@ -176,6 +176,12 @@ export function renderTerminalReport(result: ScaleResult): string {
   // Live Archetype Silhouette (proportional geometry reflecting the repo's real shape)
   if (verdict.type === "void") {
     lines.push(pc.yellow(verdict.asciiArt.trimEnd()));
+    if (result.codeFileCount === 0) {
+      lines.push("");
+      lines.push(
+        `  ${pc.dim("No source files were found either. This looks like a documentation or configuration repository, so there is nothing to weigh.")}`,
+      );
+    }
   } else {
     const silhouetteLines = renderLiveSilhouette(layers, verdict.type, 8, staticTools.length);
     for (const s of silhouetteLines) {

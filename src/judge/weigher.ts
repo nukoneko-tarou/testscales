@@ -277,6 +277,7 @@ export interface EvaluateOptions {
   includeScannedFiles?: boolean;
   typedRatio?: number;
   hasCiEnforcement?: boolean;
+  codeFileCount?: number;
 }
 
 export function evaluateScale(
@@ -291,7 +292,12 @@ export function evaluateScale(
       ? { includeScannedFiles: optionsOrIncludeScanned }
       : optionsOrIncludeScanned;
 
-  const { includeScannedFiles = false, typedRatio = 1.0, hasCiEnforcement = false } = options;
+  const {
+    includeScannedFiles = false,
+    typedRatio = 1.0,
+    hasCiEnforcement = false,
+    codeFileCount,
+  } = options;
   const layers = weighLayers(records, staticTools, { typedRatio, hasCiEnforcement });
   const totalFiles = records.length;
   const totalTests = records.reduce((sum, r) => sum + r.testCaseCount, 0);
@@ -321,6 +327,7 @@ export function evaluateScale(
     dominantLayer,
     verdict,
     scanDurationMs,
+    ...(codeFileCount !== undefined ? { codeFileCount } : {}),
     ...(includeScannedFiles ? { scannedFiles: records } : {}),
   };
 }

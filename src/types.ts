@@ -74,6 +74,7 @@ export interface ScaleResult {
   dominantLayer: TestLayer | "none";
   verdict: ArchetypeVerdict;
   scanDurationMs: number;
+  codeFileCount?: number;
   scannedFiles?: TestFileRecord[];
 }
 

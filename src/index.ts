@@ -23,7 +23,7 @@ export async function weighRepository(
   const { staticTools, hasCiEnforcement, hasPlaywright, hasCypress } = detectConfigs(rootDir);
 
   // 2. Scan and classify test files with framework context
-  const { records, typedRatio } = await scanRepository(rootDir, options.ignore, {
+  const { records, typedRatio, codeFileCount } = await scanRepository(rootDir, options.ignore, {
     hasPlaywright,
     hasCypress,
   });
@@ -35,5 +35,6 @@ export async function weighRepository(
     includeScannedFiles: Boolean(options.verbose),
     typedRatio,
     hasCiEnforcement,
+    codeFileCount,
   });
 }
