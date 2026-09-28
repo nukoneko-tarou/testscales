@@ -35,7 +35,8 @@ export const DEFAULT_IGNORE_PATTERNS = [
   "**/stubs/**", // Test stubs
   "**/test-utils/**",
   "**/test_utils/**",
-  "**/common/**", // Node.js test helpers
+  "**/test/common/**", // Node.js core test helpers
+  "**/tests/common/**",
   "**/test-setup.*", // Test runner bootstrap files
   "**/test_setup.*",
 ];
@@ -57,7 +58,7 @@ export const TEST_FILE_PATTERNS = [
 ];
 
 const TEST_IGNORE_REGEX =
-  /(?:^|\/)(?:node_modules|vendor|deps|third_party|external|__snapshots__|__mocks__|fixtures|dummy|stubs|test[-_]utils|common)\/|(?:^|\/)test[-_]setup\.[a-z]+$|\.(?:snap|d\.ts)$/i;
+  /(?:^|\/)(?:node_modules|vendor|deps|third_party|external|__snapshots__|__mocks__|fixtures|dummy|stubs|test[-_]utils)\/|(?:^|\/)tests?\/common\/|(?:^|\/)test[-_]setup\.[a-z]+$|\.(?:snap|d\.ts)$/i;
 
 const TEST_FILE_REGEX = new RegExp(
   `(?:` +

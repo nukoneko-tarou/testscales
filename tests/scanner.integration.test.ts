@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -48,5 +48,20 @@ describe("scanRepository file discovery", () => {
     execFileSync("git", ["init", "-q"], { cwd: tempDir });
     const { records } = await scanRepository(tempDir);
     expect(records.map((r) => r.filePath)).toEqual(["sum.test.ts"]);
+  });
+
+  it("limits the common/ exclusion to test helper directories", async () => {
+    mkdirSync(join(tempDir, "src/common"), { recursive: true });
+    mkdirSync(join(tempDir, "test/common"), { recursive: true });
+    writeFileSync(join(tempDir, "src/common/format.test.ts"), `it('formats', () => {})`);
+    writeFileSync(join(tempDir, "test/common/test-helper.js"), `module.exports = {}`);
+    const expected = ["src/common/format.test.ts", "sum.test.ts"];
+
+    const viaGlob = await scanRepository(tempDir);
+    expect(viaGlob.records.map((r) => r.filePath).sort()).toEqual(expected);
+
+    execFileSync("git", ["init", "-q"], { cwd: tempDir });
+    const viaGit = await scanRepository(tempDir);
+    expect(viaGit.records.map((r) => r.filePath).sort()).toEqual(expected);
   });
 });
