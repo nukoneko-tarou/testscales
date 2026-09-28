@@ -230,16 +230,17 @@ export function determineArchetype(
     };
   }
 
-  // 5. Monolith Spike: Any single layer commandingly isolates >= 85% without tiered hierarchy
-  if (intPct >= 85 || e2ePct >= 80 || (unitPct >= 95 && intPct < 2)) {
+  // 5. Monolith Spike: One layer stands alone while both other dynamic layers are practically absent (< 2%)
+  const secondLargestPct = [unitPct, intPct, e2ePct].sort((a, b) => b - a)[1] ?? 0;
+  if (secondLargestPct < 2) {
     return {
       type: "monolith-spike",
       ...ARCHETYPES["monolith-spike"],
     };
   }
 
-  // 6. Testing Trophy: Integration is dominant (Integration > Unit, >= 35%), Unit is healthy (>= 10%), E2E is bounded (<= 25%), and Static foundation exists (>= 5%)
-  if (intPct > unitPct && intPct >= 35 && unitPct >= 10 && e2ePct <= 25 && st.percentage >= 5) {
+  // 6. Testing Trophy: Integration is dominant (Integration > Unit, >= 35%), a Unit tier exists (>= 2%), E2E is bounded (<= 25%), and Static foundation exists (>= 5%)
+  if (intPct > unitPct && intPct >= 35 && unitPct >= 2 && e2ePct <= 25 && st.percentage >= 5) {
     return {
       type: "trophy",
       ...ARCHETYPES.trophy,
@@ -247,7 +248,7 @@ export function determineArchetype(
   }
 
   // 7. Integration Diamond: Integration dominates (>= 55%) over Unit and E2E, or Trophy shape without static foundation
-  if (intPct >= 55 || (intPct > unitPct && intPct >= 35 && unitPct >= 10 && e2ePct <= 25)) {
+  if (intPct >= 55 || (intPct > unitPct && intPct >= 35 && unitPct >= 2 && e2ePct <= 25)) {
     return {
       type: "diamond",
       ...ARCHETYPES.diamond,

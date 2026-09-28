@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@rstest/core";
 import { determineArchetype, weighLayers } from "../src/judge/weigher.js";
-import type { TestFileRecord } from "../src/types.js";
+import type { TestFileRecord, TestLayer } from "../src/types.js";
 
 describe("determineArchetype", () => {
   it("returns void when there are zero test files", () => {
@@ -439,5 +439,35 @@ describe("determineArchetype", () => {
     expect(stats.unit.percentage).toBeGreaterThan(60);
     expect(stats.integration.percentage).toBeGreaterThan(20);
     expect(stats.e2e.percentage).toBe(0);
+  });
+});
+
+describe("determineArchetype with a thin unit tier", () => {
+  const record = (layer: TestLayer, testCaseCount: number): TestFileRecord => ({
+    filePath: `${layer}.test.ts`,
+    language: "TypeScript",
+    layer,
+    testCaseCount,
+    linesOfCode: 50,
+    reasons: [],
+  });
+  const staticTools = [{ name: "TypeScript", configFile: "tsconfig.json" }];
+
+  it("detects Testing Trophy when integration dominates and a small unit tier exists", () => {
+    const records = [record("integration", 1000), record("unit", 40)];
+    const stats = weighLayers(records, staticTools);
+    expect(stats.unit.percentage).toBeLessThan(10);
+
+    const verdict = determineArchetype(stats, records.length);
+    expect(verdict.type).toBe("trophy");
+  });
+
+  it("detects Monolith Spike only when the other dynamic layers are practically absent", () => {
+    const records = [record("integration", 1000), record("unit", 5)];
+    const stats = weighLayers(records, staticTools);
+    expect(stats.unit.percentage).toBeLessThan(2);
+
+    const verdict = determineArchetype(stats, records.length);
+    expect(verdict.type).toBe("monolith-spike");
   });
 });

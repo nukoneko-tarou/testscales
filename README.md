@@ -53,7 +53,7 @@ Tested across major open-source codebases, completing analysis in milliseconds:
 | **💎 The Integration Diamond** | Diamond | Microservices & APIs | Boundary contracts, database transactions, protocol gates. |
 | **🍦 The Ice Cream Cone** | Cone | UI / Critical Flows | Real browser testing at top, but watch out for slow CI times. |
 | **⌛ The Hourglass** | Hourglass | Polarized Suites | Pure units + full smoke journeys, with middle integration omitted. |
-| **🗡️ The Monolith Spike** | Spike | Hyper-focused projects | One layer commands 80%+ of test weight. |
+| **🗡️ The Monolith Spike** | Spike | Hyper-focused projects | One layer stands alone; the other dynamic layers are practically absent. |
 | **⚖️ The Scales of Equanimity** | Balance | Defense-in-depth | Symmetrical equilibrium across all four layers. |
 | **🛡️ The Prayer-Driven Void** | Void | YOLO & Fast Prototypes | Zero tests. "Production is the ultimate test suite." |
 
