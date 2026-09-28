@@ -1,6 +1,6 @@
 {
   "name": "testscales",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Weigh the soul and archetype of your test suite with divine precision",
   "type": "module",
   "bin": {
