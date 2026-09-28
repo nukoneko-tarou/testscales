@@ -119,6 +119,18 @@ describe("classifyFile with .spec and naming patterns", () => {
     expect(container.layer).toBe("integration");
   });
 
+  it("recognizes React Native Testing Library imports as integration", () => {
+    const res = classifyFile(
+      "src/badge.test.tsx",
+      `
+      import { screen } from '@testing-library/react-native'
+      it('shows the label', () => {})
+    `,
+    );
+    expect(res.layer).toBe("integration");
+    expect(res.reasons).toContain("Testing Library import");
+  });
+
   it("classifies isolated mock specs as unit", () => {
     const res = classifyFile(
       "src/utils/math.spec.ts",

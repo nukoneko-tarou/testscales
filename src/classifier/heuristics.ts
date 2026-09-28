@@ -86,7 +86,7 @@ const E2E_INDICATORS = [
 const INTEGRATION_INDICATORS = [
   {
     pattern:
-      /(?:^|\n)\s*(?:import\b[\s\S]*?from\s+['"]@testing-library\/(?:react|vue|svelte|angular|dom|user-event)['"]|const\b[\s\S]*?=\s*require\(['"]@testing-library)/i,
+      /(?:^|\n)\s*(?:import\b[\s\S]*?from\s+['"]@testing-library\/(?:react-native|react|vue|svelte|angular|dom|user-event)['"]|const\b[\s\S]*?=\s*require\(['"]@testing-library)/i,
     reason: "Testing Library import",
   },
   {
