@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "@rstest/core";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { detectConfigs } from "../src/scanner/config-detector.js";
@@ -92,5 +92,32 @@ strict = true
 
     const oxfmt = result.staticTools.find((t) => t.name === "Oxfmt");
     expect(oxfmt?.category).toBe("formatter");
+  });
+
+  it("detects static tools in workspace packages without duplicating them", () => {
+    writeFileSync(join(tempDir, "package.json"), JSON.stringify({ private: true }));
+    writeFileSync(join(tempDir, "tsconfig.json"), JSON.stringify({ compilerOptions: {} }));
+    for (const pkg of ["packages/web", "packages/api"]) {
+      mkdirSync(join(tempDir, pkg), { recursive: true });
+      writeFileSync(join(tempDir, pkg, "package.json"), "{}");
+      writeFileSync(
+        join(tempDir, pkg, "tsconfig.json"),
+        JSON.stringify({ compilerOptions: { strict: true } }),
+      );
+    }
+    writeFileSync(join(tempDir, "packages/web/eslint.config.js"), "export default []");
+    mkdirSync(join(tempDir, "backend"));
+    writeFileSync(join(tempDir, "backend/go.mod"), "module backend");
+    mkdirSync(join(tempDir, "node_modules/dep"), { recursive: true });
+    writeFileSync(join(tempDir, "node_modules/dep/package.json"), "{}");
+    writeFileSync(join(tempDir, "node_modules/dep/biome.json"), "{}");
+
+    const tools = detectConfigs(tempDir).staticTools;
+    expect(tools.map((t) => `${t.name}:${t.configFile}`).sort()).toEqual([
+      "ESLint:packages/web/eslint.config.js",
+      "Go Type System:backend/go.mod",
+      "TypeScript:tsconfig.json",
+    ]);
+    expect(tools.find((t) => t.name === "TypeScript")?.isStrict).toBe(true);
   });
 });

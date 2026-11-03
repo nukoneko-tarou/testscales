@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { type Dirent, existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { StaticAnalysisRecord, StaticToolCategory } from "../types.js";
 
@@ -83,170 +83,249 @@ const STATIC_CONFIG_PATTERNS: StaticPattern[] = [
   { name: "Rector", files: ["rector.php"], category: "linter" },
 ];
 
+const PROJECT_MANIFESTS = [
+  "package.json",
+  "tsconfig.json",
+  "pyproject.toml",
+  "go.mod",
+  "Cargo.toml",
+  "composer.json",
+  "Gemfile",
+];
+const SKIPPED_DIRS = new Set(["node_modules", "vendor", "dist", "build", "target", "coverage"]);
+
+/**
+ * The root plus workspace packages up to two levels deep (packages/foo, apps/web, backend),
+ * recognised by a project manifest. Root comes first so its configs take precedence.
+ */
+function listProjectDirs(rootDir: string): string[] {
+  const projectDirs = [""];
+  let frontier = [""];
+  for (let depth = 0; depth < 2; depth++) {
+    const next: string[] = [];
+    for (const dir of frontier) {
+      let entries: Dirent[];
+      try {
+        entries = readdirSync(join(rootDir, dir), { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const e of entries) {
+        if (e.isDirectory() && !e.name.startsWith(".") && !SKIPPED_DIRS.has(e.name)) {
+          next.push(dir ? `${dir}/${e.name}` : e.name);
+        }
+      }
+    }
+    for (const dir of next) {
+      if (PROJECT_MANIFESTS.some((m) => existsSync(join(rootDir, dir, m)))) projectDirs.push(dir);
+    }
+    frontier = next;
+  }
+  return projectDirs;
+}
+
 export function detectConfigs(rootDir: string): DetectedConfigs {
   const staticTools: StaticAnalysisRecord[] = [];
   const recordedTools = new Set<string>();
 
-  // 1. Check standalone config files
-  for (const { name, files, category } of STATIC_CONFIG_PATTERNS) {
-    for (const file of files) {
-      const fullPath = join(rootDir, file);
-      if (existsSync(fullPath)) {
-        let isStrict = false;
-        if (name === "TypeScript") {
-          try {
-            const content = readFileSync(fullPath, "utf8");
-            if (
-              /"strict"\s*:\s*true/i.test(content) ||
-              /"strictNullChecks"\s*:\s*true/i.test(content)
-            ) {
-              isStrict = true;
+  for (const projectDir of listProjectDirs(rootDir)) {
+    const dir = join(rootDir, projectDir);
+    const rel = (file: string) => (projectDir ? `${projectDir}/${file}` : file);
+
+    // 1. Check standalone config files
+    for (const { name, files, category } of STATIC_CONFIG_PATTERNS) {
+      for (const file of files) {
+        const fullPath = join(dir, file);
+        if (existsSync(fullPath)) {
+          let isStrict = false;
+          if (name === "TypeScript") {
+            try {
+              const content = readFileSync(fullPath, "utf8");
+              if (
+                /"strict"\s*:\s*true/i.test(content) ||
+                /"strictNullChecks"\s*:\s*true/i.test(content)
+              ) {
+                isStrict = true;
+              }
+            } catch {
+              // ignore read error
             }
-          } catch {
-            // ignore read error
-          }
-        } else if (name === "PHPStan") {
-          try {
-            const content = readFileSync(fullPath, "utf8");
-            if (/level:\s*(?:8|9|max)/i.test(content)) {
-              isStrict = true;
+          } else if (name === "PHPStan") {
+            try {
+              const content = readFileSync(fullPath, "utf8");
+              if (/level:\s*(?:8|9|max)/i.test(content)) {
+                isStrict = true;
+              }
+            } catch {
+              // ignore read error
             }
-          } catch {
-            // ignore read error
-          }
-        } else if (name === "Psalm") {
-          try {
-            const content = readFileSync(fullPath, "utf8");
-            if (
-              /errorLevel\s*=\s*["']?[12]["']?/i.test(content) ||
-              /totallyTyped\s*=\s*["']true["']/i.test(content)
-            ) {
-              isStrict = true;
+          } else if (name === "Psalm") {
+            try {
+              const content = readFileSync(fullPath, "utf8");
+              if (
+                /errorLevel\s*=\s*["']?[12]["']?/i.test(content) ||
+                /totallyTyped\s*=\s*["']true["']/i.test(content)
+              ) {
+                isStrict = true;
+              }
+            } catch {
+              // ignore read error
             }
-          } catch {
-            // ignore read error
           }
+          // One record per tool; a strict config in any workspace package marks it strict.
+          const existing = staticTools.find((t) => t.name === name);
+          if (existing) {
+            if (isStrict) existing.isStrict = true;
+            break;
+          }
+          staticTools.push({
+            name,
+            configFile: rel(file),
+            category,
+            ...(isStrict ? { isStrict: true } : {}),
+          });
+          recordedTools.add(name);
+          break;
         }
-        staticTools.push({
-          name,
-          configFile: file,
-          category,
-          ...(isStrict ? { isStrict: true } : {}),
-        });
-        recordedTools.add(name);
-        break;
       }
     }
-  }
 
-  // 2. Check pyproject.toml for inline Python static tools
-  const pyprojectPath = join(rootDir, "pyproject.toml");
-  if (existsSync(pyprojectPath)) {
-    try {
-      const content = readFileSync(pyprojectPath, "utf8");
-      if (!recordedTools.has("Ruff") && /\[tool\.ruff/i.test(content)) {
-        staticTools.push({ name: "Ruff", configFile: "pyproject.toml", category: "linter" });
-        recordedTools.add("Ruff");
+    // 2. Check pyproject.toml for inline Python static tools
+    const pyprojectPath = join(dir, "pyproject.toml");
+    if (existsSync(pyprojectPath)) {
+      try {
+        const content = readFileSync(pyprojectPath, "utf8");
+        if (!recordedTools.has("Ruff") && /\[tool\.ruff/i.test(content)) {
+          staticTools.push({ name: "Ruff", configFile: rel("pyproject.toml"), category: "linter" });
+          recordedTools.add("Ruff");
+        }
+        if (!recordedTools.has("MyPy") && /\[tool\.mypy/i.test(content)) {
+          const isStrict = /strict\s*=\s*true/i.test(content);
+          staticTools.push({
+            name: "MyPy",
+            configFile: rel("pyproject.toml"),
+            category: "typechecker",
+            ...(isStrict ? { isStrict: true } : {}),
+          });
+          recordedTools.add("MyPy");
+        }
+        if (!recordedTools.has("Pyright") && /\[tool\.pyright/i.test(content)) {
+          staticTools.push({
+            name: "Pyright",
+            configFile: rel("pyproject.toml"),
+            category: "typechecker",
+          });
+          recordedTools.add("Pyright");
+        }
+        if (!recordedTools.has("Flake8") && /\[tool\.flake8/i.test(content)) {
+          staticTools.push({
+            name: "Flake8",
+            configFile: rel("pyproject.toml"),
+            category: "linter",
+          });
+          recordedTools.add("Flake8");
+        }
+      } catch {
+        // ignore
       }
-      if (!recordedTools.has("MyPy") && /\[tool\.mypy/i.test(content)) {
-        const isStrict = /strict\s*=\s*true/i.test(content);
-        staticTools.push({
-          name: "MyPy",
-          configFile: "pyproject.toml",
-          category: "typechecker",
-          ...(isStrict ? { isStrict: true } : {}),
-        });
-        recordedTools.add("MyPy");
-      }
-      if (!recordedTools.has("Pyright") && /\[tool\.pyright/i.test(content)) {
-        staticTools.push({
-          name: "Pyright",
-          configFile: "pyproject.toml",
-          category: "typechecker",
-        });
-        recordedTools.add("Pyright");
-      }
-      if (!recordedTools.has("Flake8") && /\[tool\.flake8/i.test(content)) {
-        staticTools.push({ name: "Flake8", configFile: "pyproject.toml", category: "linter" });
-        recordedTools.add("Flake8");
-      }
-    } catch {
-      // ignore
     }
-  }
 
-  // 3. Check package.json for inline eslint, biome, oxlint, or oxfmt
-  const pkgJsonPath = join(rootDir, "package.json");
-  if (existsSync(pkgJsonPath)) {
-    try {
-      const content = readFileSync(pkgJsonPath, "utf8");
-      if (!recordedTools.has("ESLint") && /"eslintConfig"/i.test(content)) {
-        staticTools.push({ name: "ESLint", configFile: "package.json", category: "linter" });
-        recordedTools.add("ESLint");
+    // 3. Check package.json for inline eslint, biome, oxlint, or oxfmt
+    const pkgJsonPath = join(dir, "package.json");
+    if (existsSync(pkgJsonPath)) {
+      try {
+        const content = readFileSync(pkgJsonPath, "utf8");
+        if (!recordedTools.has("ESLint") && /"eslintConfig"/i.test(content)) {
+          staticTools.push({ name: "ESLint", configFile: rel("package.json"), category: "linter" });
+          recordedTools.add("ESLint");
+        }
+        if (!recordedTools.has("Biome") && /"biome"/i.test(content)) {
+          staticTools.push({ name: "Biome", configFile: rel("package.json"), category: "linter" });
+          recordedTools.add("Biome");
+        }
+        if (!recordedTools.has("Oxlint") && /"(?:@oxc-project\/oxlint|oxlint)"/i.test(content)) {
+          staticTools.push({ name: "Oxlint", configFile: rel("package.json"), category: "linter" });
+          recordedTools.add("Oxlint");
+        }
+        if (!recordedTools.has("Oxfmt") && /"(?:@oxc-project\/oxfmt|oxfmt)"/i.test(content)) {
+          staticTools.push({
+            name: "Oxfmt",
+            configFile: rel("package.json"),
+            category: "formatter",
+          });
+          recordedTools.add("Oxfmt");
+        }
+      } catch {
+        // ignore
       }
-      if (!recordedTools.has("Biome") && /"biome"/i.test(content)) {
-        staticTools.push({ name: "Biome", configFile: "package.json", category: "linter" });
-        recordedTools.add("Biome");
-      }
-      if (!recordedTools.has("Oxlint") && /"(?:@oxc-project\/oxlint|oxlint)"/i.test(content)) {
-        staticTools.push({ name: "Oxlint", configFile: "package.json", category: "linter" });
-        recordedTools.add("Oxlint");
-      }
-      if (!recordedTools.has("Oxfmt") && /"(?:@oxc-project\/oxfmt|oxfmt)"/i.test(content)) {
-        staticTools.push({ name: "Oxfmt", configFile: "package.json", category: "formatter" });
-        recordedTools.add("Oxfmt");
-      }
-    } catch {
-      // ignore
     }
-  }
 
-  // 4. Check composer.json for PHP static tools
-  const composerJsonPath = join(rootDir, "composer.json");
-  if (existsSync(composerJsonPath)) {
-    try {
-      const content = readFileSync(composerJsonPath, "utf8");
-      if (!recordedTools.has("PHPStan") && /"phpstan\/phpstan"/i.test(content)) {
-        staticTools.push({ name: "PHPStan", configFile: "composer.json", category: "typechecker" });
-        recordedTools.add("PHPStan");
+    // 4. Check composer.json for PHP static tools
+    const composerJsonPath = join(dir, "composer.json");
+    if (existsSync(composerJsonPath)) {
+      try {
+        const content = readFileSync(composerJsonPath, "utf8");
+        if (!recordedTools.has("PHPStan") && /"phpstan\/phpstan"/i.test(content)) {
+          staticTools.push({
+            name: "PHPStan",
+            configFile: rel("composer.json"),
+            category: "typechecker",
+          });
+          recordedTools.add("PHPStan");
+        }
+        if (!recordedTools.has("Psalm") && /"vimeo\/psalm"/i.test(content)) {
+          staticTools.push({
+            name: "Psalm",
+            configFile: rel("composer.json"),
+            category: "typechecker",
+          });
+          recordedTools.add("Psalm");
+        }
+        if (!recordedTools.has("Pint") && /"laravel\/pint"/i.test(content)) {
+          staticTools.push({
+            name: "Pint",
+            configFile: rel("composer.json"),
+            category: "formatter",
+          });
+          recordedTools.add("Pint");
+        }
+        if (!recordedTools.has("PHP-CS-Fixer") && /"friendsofphp\/php-cs-fixer"/i.test(content)) {
+          staticTools.push({
+            name: "PHP-CS-Fixer",
+            configFile: rel("composer.json"),
+            category: "formatter",
+          });
+          recordedTools.add("PHP-CS-Fixer");
+        }
+        if (
+          !recordedTools.has("PHP_CodeSniffer") &&
+          /"squizlabs\/php_codesniffer"/i.test(content)
+        ) {
+          staticTools.push({
+            name: "PHP_CodeSniffer",
+            configFile: rel("composer.json"),
+            category: "linter",
+          });
+          recordedTools.add("PHP_CodeSniffer");
+        }
+      } catch {
+        // ignore
       }
-      if (!recordedTools.has("Psalm") && /"vimeo\/psalm"/i.test(content)) {
-        staticTools.push({ name: "Psalm", configFile: "composer.json", category: "typechecker" });
-        recordedTools.add("Psalm");
-      }
-      if (!recordedTools.has("Pint") && /"laravel\/pint"/i.test(content)) {
-        staticTools.push({ name: "Pint", configFile: "composer.json", category: "formatter" });
-        recordedTools.add("Pint");
-      }
-      if (!recordedTools.has("PHP-CS-Fixer") && /"friendsofphp\/php-cs-fixer"/i.test(content)) {
-        staticTools.push({
-          name: "PHP-CS-Fixer",
-          configFile: "composer.json",
-          category: "formatter",
-        });
-        recordedTools.add("PHP-CS-Fixer");
-      }
-      if (!recordedTools.has("PHP_CodeSniffer") && /"squizlabs\/php_codesniffer"/i.test(content)) {
-        staticTools.push({
-          name: "PHP_CodeSniffer",
-          configFile: "composer.json",
-          category: "linter",
-        });
-        recordedTools.add("PHP_CodeSniffer");
-      }
-    } catch {
-      // ignore
     }
-  }
 
-  // 5. Native statically-typed language indicators (Go, Rust)
-  if (existsSync(join(rootDir, "go.mod")) && !recordedTools.has("Go Compiler/Types")) {
-    staticTools.push({ name: "Go Type System", configFile: "go.mod", category: "compiler" });
-    recordedTools.add("Go Type System");
-  }
-  if (existsSync(join(rootDir, "Cargo.toml")) && !recordedTools.has("Rust Type System")) {
-    staticTools.push({ name: "Rust Type System", configFile: "Cargo.toml", category: "compiler" });
-    recordedTools.add("Rust Type System");
+    // 5. Native statically-typed language indicators (Go, Rust)
+    if (existsSync(join(dir, "go.mod")) && !recordedTools.has("Go Type System")) {
+      staticTools.push({ name: "Go Type System", configFile: rel("go.mod"), category: "compiler" });
+      recordedTools.add("Go Type System");
+    }
+    if (existsSync(join(dir, "Cargo.toml")) && !recordedTools.has("Rust Type System")) {
+      staticTools.push({
+        name: "Rust Type System",
+        configFile: rel("Cargo.toml"),
+        category: "compiler",
+      });
+      recordedTools.add("Rust Type System");
+    }
   }
 
   const hasPlaywright = [
