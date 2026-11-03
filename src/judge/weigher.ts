@@ -14,9 +14,13 @@ export interface WeighOptions {
   hasCiEnforcement?: boolean;
 }
 
+/**
+ * @param _records Unused and deprecated. Kept only so existing (tools, records, options)
+ * call sites keep passing options in the right position; pass `[]`.
+ */
 export function calculateStaticCoverage(
   staticTools: StaticAnalysisRecord[],
-  records: TestFileRecord[] = [],
+  _records: TestFileRecord[] = [],
   options: WeighOptions = {},
 ): number {
   if (staticTools.length === 0) {
@@ -137,7 +141,7 @@ export function weighLayers(
   }
 
   // 1. STATIC layer: Independent 0-100% defense coverage score
-  const staticScore = calculateStaticCoverage(staticTools, records, options);
+  const staticScore = calculateStaticCoverage(staticTools, [], options);
   stats.static.percentage = staticScore;
   stats.static.weight = staticScore;
 
