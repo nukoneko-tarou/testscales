@@ -168,8 +168,10 @@ async function processTestFile(
 }
 
 // Classification is CPU-bound regex work, so large suites are split across worker
-// threads. A worker costs a module load (~tens of ms), so each must get enough files.
-const MIN_FILES_PER_WORKER = 200;
+// threads. A worker costs a module load (~15 ms), so each must get enough files, and
+// at most half the cores are used: the rest keep git's untracked-file walk and the
+// worker start-up from contending (more workers measured slower on 12 cores).
+const MIN_FILES_PER_WORKER = 100;
 const WORKER_KEY = "testscales:classify";
 
 interface WorkerJob {
@@ -184,7 +186,7 @@ function processTestFiles(
   context: ClassifyContext,
 ): Promise<(TestFileRecord | null)[]> {
   const workerCount = Math.min(
-    availableParallelism(),
+    Math.ceil(availableParallelism() / 2),
     Math.floor(files.length / MIN_FILES_PER_WORKER),
   );
   const inThread = () => poolMap(files, (file) => processTestFile(rootDir, file, context));
