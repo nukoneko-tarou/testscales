@@ -176,3 +176,56 @@ describe("classifyFile JSX detection", () => {
     expect(paired.layer).toBe("integration");
   });
 });
+
+describe("classifyFile side-effect detection", () => {
+  it("classifies tests touching the real filesystem or child processes as integration", () => {
+    const fsTest = `
+      import { mkdtemp, writeFile } from 'node:fs/promises'
+      it('scans', async () => { const dir = await mkdtemp('x'); await writeFile(dir + '/a', '') })
+    `;
+    expect(classifyFile("src/scan.test.ts", fsTest).layer).toBe("integration");
+    const spawnTest = `it('runs cli', () => { spawnSync('node', ['cli.js']) })`;
+    expect(classifyFile("src/cli.test.ts", spawnTest).layer).toBe("integration");
+    expect(classifyFile("src/re.test.ts", `it('m', () => { /a/.exec('a') })`).layer).toBe("unit");
+  });
+});
+
+describe("side-effect upgrade applies to every language and to unit paths", () => {
+  const cases: [string, string][] = [
+    ["tests/unit/cli.test.ts", `it('runs', () => { execFileSync('node', ['cli.js']) })`],
+    ["tests/test_io.py", `def test_write(tmp_path):\n    (tmp_path / 'a').write_text('x')`],
+    ["tests/test_cli.py", `def test_cli():\n    subprocess.run(['ls'])`],
+    ["pkg/io_test.go", `func TestWrite(t *testing.T) { dir := t.TempDir(); _ = dir }`],
+    ["pkg/cli_test.go", `func TestCli(t *testing.T) { exec.Command("ls").Run() }`],
+    [
+      "spec/models/export_spec.rb",
+      `it 'writes' do\n  Dir.mktmpdir { |d| File.write(d, 'x') }\nend`,
+    ],
+    ["spec/lib/cli_spec.rb", `it 'runs' do\n  Open3.capture2('ls')\nend`],
+    [
+      "tests/Unit/ExportTest.php",
+      `public function testWrite() { file_put_contents(sys_get_temp_dir() . '/a', 'x'); }`,
+    ],
+    ["tests/Unit/CliTest.php", `public function testCli() { $p = new Process(['ls']); }`],
+  ];
+  for (const [path, content] of cases) {
+    it(`upgrades ${path} to integration`, () => {
+      expect(classifyFile(path, content).layer).toBe("integration");
+    });
+  }
+
+  it("keeps pure tests and look-alike calls as unit", () => {
+    expect(classifyFile("src/re.test.ts", `it('m', () => { /a/.exec('a') })`).layer).toBe("unit");
+    expect(classifyFile("tests/test_math.py", `def test_add():\n    assert 1 + 1 == 2`).layer).toBe(
+      "unit",
+    );
+    expect(
+      classifyFile("tests/Unit/MathTest.php", `public function testAdd() { $this->exec(); }`).layer,
+    ).toBe("unit");
+  });
+
+  it("never downgrades E2E", () => {
+    const pw = `import { test } from '@playwright/test'\ntest('a', async () => { await writeFile('x', '') })`;
+    expect(classifyFile("src/flow.test.ts", pw).layer).toBe("e2e");
+  });
+});

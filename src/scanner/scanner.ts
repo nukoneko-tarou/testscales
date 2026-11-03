@@ -4,11 +4,7 @@ import { availableParallelism } from "node:os";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { glob } from "tinyglobby";
-import {
-  type ClassifyContext,
-  classifyByPathOnly,
-  classifyFile,
-} from "../classifier/heuristics.js";
+import { type ClassifyContext, classifyFile } from "../classifier/heuristics.js";
 import type { TestFileRecord } from "../types.js";
 
 const execFileAsync = promisify(execFile);
@@ -196,40 +192,19 @@ async function processTestFile(
   relativeFilePath: string,
   context: ClassifyContext,
 ): Promise<TestFileRecord> {
-  const fullPath = resolve(rootDir, relativeFilePath);
-
-  // Fast-path path match
-  const fastMatch = classifyByPathOnly(relativeFilePath, context);
-
   let content = "";
   try {
-    content = await readFile(fullPath, "utf-8");
+    content = await readFile(resolve(rootDir, relativeFilePath), "utf-8");
   } catch {
     content = "";
   }
 
-  if (fastMatch) {
-    const classification = classifyFile(relativeFilePath, content, context);
-    return {
-      filePath: relativeFilePath,
-      language: classification.language,
-      layer: fastMatch.layer,
-      testCaseCount: classification.testCaseCount,
-      linesOfCode: classification.linesOfCode,
-      reasons: fastMatch.reasons,
-    };
-  }
-
-  const classification = classifyFile(relativeFilePath, content, context);
-
-  return {
-    filePath: relativeFilePath,
-    language: classification.language,
-    layer: classification.layer,
-    testCaseCount: classification.testCaseCount,
-    linesOfCode: classification.linesOfCode,
-    reasons: classification.reasons,
-  };
+  const { layer, language, testCaseCount, linesOfCode, reasons } = classifyFile(
+    relativeFilePath,
+    content,
+    context,
+  );
+  return { filePath: relativeFilePath, language, layer, testCaseCount, linesOfCode, reasons };
 }
 
 export async function scanRepository(

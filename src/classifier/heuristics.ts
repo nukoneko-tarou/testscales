@@ -116,6 +116,68 @@ const INTEGRATION_INDICATORS = [
   { pattern: /\bscreen\.(?:getBy|findBy|queryBy)[A-Za-z]+\s*\(/i, reason: "DOM screen queries" },
 ];
 
+// 3. Side-effect indicators: real filesystem I/O or child processes make a test
+// integration regardless of path. Applied per language; only ever upgrades unit → integration.
+const FS_REASON = "Real filesystem I/O (temp dir / file write)";
+const PROC_REASON = "Child process execution";
+const JS_SIDE_EFFECTS = [
+  {
+    pattern: /\bmkdtemp(?:Sync)?\s*\(|\b(?:writeFile|appendFile)(?:Sync)?\s*\(/,
+    reason: FS_REASON,
+  },
+  {
+    pattern:
+      /(?<![.\w])(?:spawn|spawnSync|exec|execSync|execFile|execFileSync|execa|fork)\s*\(|\bBun\.spawn(?:Sync)?\s*\(|\bchild_process\.\w+\s*\(/,
+    reason: PROC_REASON,
+  },
+];
+const SIDE_EFFECT_INDICATORS: Record<string, { pattern: RegExp; reason: string }[]> = {
+  TypeScript: JS_SIDE_EFFECTS,
+  JavaScript: JS_SIDE_EFFECTS,
+  Python: [
+    {
+      pattern:
+        /\btempfile\.(?:mkdtemp|mkstemp|TemporaryDirectory|NamedTemporaryFile)\b|\b(?:tmp_path|tmpdir)\b|\.write_(?:text|bytes)\s*\(|\bopen\s*\([^)]*['"][wax]b?\+?['"]/,
+      reason: FS_REASON,
+    },
+    {
+      pattern:
+        /\bsubprocess\.(?:run|Popen|call|check_call|check_output)\b|\bos\.(?:system|popen)\s*\(/,
+      reason: PROC_REASON,
+    },
+  ],
+  Go: [
+    {
+      pattern:
+        /\b(?:os\.(?:MkdirTemp|CreateTemp|WriteFile)|ioutil\.(?:TempDir|TempFile|WriteFile)|t\.TempDir)\s*\(/,
+      reason: FS_REASON,
+    },
+    { pattern: /\bexec\.Command(?:Context)?\s*\(/, reason: PROC_REASON },
+  ],
+  Ruby: [
+    {
+      pattern:
+        /\bDir\.mktmpdir\b|\bTempfile\.(?:new|create)\b|\bFile\.(?:write|binwrite)\b|\bFile\.open\s*\([^)]*['"][wa]b?\+?['"]/,
+      reason: FS_REASON,
+    },
+    {
+      pattern: /\bOpen3\.\w+|\bIO\.popen\b|(?<![.\w])(?:system|spawn)\s*\(/,
+      reason: PROC_REASON,
+    },
+  ],
+  PHP: [
+    {
+      pattern: /\b(?:sys_get_temp_dir|tempnam|tmpfile|file_put_contents)\s*\(/,
+      reason: FS_REASON,
+    },
+    {
+      pattern:
+        /(?<![.\w>$:])(?:exec|shell_exec|system|passthru|proc_open|popen)\s*\(|\bnew\s+(?:\\?Symfony\\Component\\Process\\)?Process\s*\(/,
+      reason: PROC_REASON,
+    },
+  ],
+};
+
 const UNIT_INDICATORS = [
   { pattern: /\bvi\.mock\s*\(|\bjest\.mock\s*\(/i, reason: "Heavy module mocking" },
   { pattern: /\bsinon\.(?:spy|stub|mock)\s*\(/i, reason: "Test double spy/stub" },
@@ -240,7 +302,6 @@ export function classifyFile(
   content: string,
   context: ClassifyContext = {},
 ): ClassifyResult {
-  const reasons: string[] = [];
   const linesOfCode = countNonEmptyLines(content);
   const language = detectFileLanguage(filePath);
 
@@ -259,61 +320,52 @@ export function classifyFile(
   }
 
   const testCaseCount = countTestCases(content);
-
-  // 1. Fast path: Check path heuristics first
-  const fastPath = classifyByPathOnly(filePath, context);
-  if (fastPath) {
-    return {
-      layer: fastPath.layer,
-      language,
-      testCaseCount,
-      linesOfCode,
-      reasons: fastPath.reasons,
-    };
+  const { layer, reasons } = classifyLayer(filePath, content, context);
+  if (layer === "unit") {
+    const sideEffect = SIDE_EFFECT_INDICATORS[language]?.find((i) => i.pattern.test(content));
+    if (sideEffect) {
+      return {
+        layer: "integration",
+        language,
+        testCaseCount,
+        linesOfCode,
+        reasons: [sideEffect.reason],
+      };
+    }
   }
+  return { layer, language, testCaseCount, linesOfCode, reasons };
+}
 
-  // 2. Multi-language classifiers (Python, Go, Ruby)
+function classifyLayer(
+  filePath: string,
+  content: string,
+  context: ClassifyContext,
+): { layer: TestLayer; reasons: string[] } {
+  // 1. Path heuristics (explicit signal)
+  const fastPath = classifyByPathOnly(filePath, context);
+  if (fastPath) return fastPath;
+
+  // 2. Multi-language classifiers (Python, Go, Ruby, PHP)
   for (const classifier of LANGUAGE_CLASSIFIERS) {
     if (classifier.supports(filePath)) {
       const langResult = classifier.classify(filePath, content);
-      if (langResult) {
-        return {
-          layer: langResult.layer,
-          language,
-          testCaseCount,
-          linesOfCode,
-          reasons: langResult.reasons,
-        };
-      }
+      if (langResult) return langResult;
       break;
     }
   }
 
-  // 2. Early-bailout header chunk (imports are always at file top)
-  const headerChunk = content.length > 4096 ? content.slice(0, 4096) : content;
-
   // 3. Content-based heuristic classification
   for (const indicator of E2E_INDICATORS) {
-    if (indicator.pattern.test(headerChunk) || indicator.pattern.test(content)) {
-      reasons.push(indicator.reason);
-      return { layer: "e2e", language, testCaseCount, linesOfCode, reasons };
-    }
+    if (indicator.pattern.test(content)) return { layer: "e2e", reasons: [indicator.reason] };
   }
 
   for (const indicator of INTEGRATION_INDICATORS) {
-    if (indicator.pattern.test(headerChunk) || indicator.pattern.test(content)) {
-      reasons.push(indicator.reason);
-      return { layer: "integration", language, testCaseCount, linesOfCode, reasons };
+    if (indicator.pattern.test(content)) {
+      return { layer: "integration", reasons: [indicator.reason] };
     }
   }
 
-  for (const indicator of UNIT_INDICATORS) {
-    if (indicator.pattern.test(headerChunk) || indicator.pattern.test(content)) {
-      reasons.push(indicator.reason);
-    }
-  }
-
-  // Default fallback: Isolated unit test
+  const reasons = UNIT_INDICATORS.filter((i) => i.pattern.test(content)).map((i) => i.reason);
   reasons.push("Isolated specification without DOM/network integration markers");
-  return { layer: "unit", language, testCaseCount, linesOfCode, reasons };
+  return { layer: "unit", reasons };
 }
