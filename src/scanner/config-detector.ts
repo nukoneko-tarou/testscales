@@ -92,7 +92,18 @@ const PROJECT_MANIFESTS = [
   "composer.json",
   "Gemfile",
 ];
-const SKIPPED_DIRS = new Set(["node_modules", "vendor", "dist", "build", "target", "coverage"]);
+// Vendored and generated code: its configs describe someone else's project.
+const SKIPPED_DIRS = new Set([
+  "node_modules",
+  "vendor",
+  "deps",
+  "third_party",
+  "external",
+  "dist",
+  "build",
+  "target",
+  "coverage",
+]);
 
 /**
  * The root plus workspace packages up to two levels deep (packages/foo, apps/web, backend),

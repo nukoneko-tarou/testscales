@@ -111,6 +111,8 @@ strict = true
     mkdirSync(join(tempDir, "node_modules/dep"), { recursive: true });
     writeFileSync(join(tempDir, "node_modules/dep/package.json"), "{}");
     writeFileSync(join(tempDir, "node_modules/dep/biome.json"), "{}");
+    mkdirSync(join(tempDir, "deps/crates"), { recursive: true });
+    writeFileSync(join(tempDir, "deps/crates/Cargo.toml"), "[workspace]");
 
     const tools = detectConfigs(tempDir).staticTools;
     expect(tools.map((t) => `${t.name}:${t.configFile}`).sort()).toEqual([
