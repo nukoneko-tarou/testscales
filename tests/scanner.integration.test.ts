@@ -135,7 +135,10 @@ describe("scanRepository file discovery", () => {
     );
     writeFileSync(join(tempDir, "src/main.rs"), `fn main() {}`);
     writeFileSync(join(tempDir, "tests/cli.rs"), `#[test]\nfn runs() {}`);
+    mkdirSync(join(tempDir, "vendor/dep/src"), { recursive: true });
+    writeFileSync(join(tempDir, "vendor/dep/src/lib.rs"), `#[cfg(test)]\nmod tests {}`);
 
+    execFileSync("git", ["init", "-q"], { cwd: tempDir });
     const { records } = await scanRepository(tempDir);
     const byPath = Object.fromEntries(records.map((r) => [r.filePath, r]));
     expect(Object.keys(byPath).sort()).toEqual(["src/lib.rs", "sum.test.ts", "tests/cli.rs"]);

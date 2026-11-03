@@ -174,7 +174,9 @@ export async function scanRepository(
       codeFileCount++;
     }
     // .rs files are candidates for inline #[cfg(test)] modules; processTestFile drops the rest.
-    if (isTestFile(file) || ext === ".rs") testFiles.push(file);
+    if (isTestFile(file) || (ext === ".rs" && !TEST_IGNORE_REGEX.test(file))) {
+      testFiles.push(file);
+    }
   }
 
   const records = (
