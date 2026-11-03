@@ -64,25 +64,38 @@ const UNTYPED_EXTENSIONS = new Set([".js", ".jsx", ".mjs", ".cjs", ".py", ".rb",
 /**
  * Lists candidate files. The git index is the fast path (bypasses recursive readdir and
  * honours .gitignore); tinyglobby is the fallback outside git or when --ignore globs are given.
+ *
+ * Untracked files come back separately in `later`: listing them walks the whole work tree
+ * (~10x slower than reading the index on large repos), so tracked files are processed
+ * while git is still walking.
  */
-async function listFiles(rootDir: string, customIgnore: string[]): Promise<string[]> {
+async function listFiles(
+  rootDir: string,
+  customIgnore: string[],
+): Promise<{ now: string[]; later: Promise<string[]> }> {
   if (customIgnore.length === 0) {
-    try {
-      const { stdout } = await execFileAsync(
-        "git",
-        ["ls-files", "--cached", "--others", "--exclude-standard"],
-        { cwd: rootDir, maxBuffer: 50 * 1024 * 1024 },
-      );
+    const gitLsFiles = async (args: string[]) => {
+      const { stdout } = await execFileAsync("git", ["ls-files", ...args], {
+        cwd: rootDir,
+        maxBuffer: 50 * 1024 * 1024,
+      });
       return stdout.split("\n").filter(Boolean);
+    };
+    const untracked = gitLsFiles(["--others", "--exclude-standard"]);
+    // Outside git this rejects while --cached is still pending; mark it handled up front.
+    untracked.catch(() => {});
+    try {
+      return { now: await gitLsFiles(["--cached"]), later: untracked };
     } catch {
       // not a git repository: fall through to glob
     }
   }
-  return glob("**/*", {
+  const files = await glob("**/*", {
     cwd: rootDir,
     ignore: [...DEFAULT_IGNORE_PATTERNS, ...customIgnore],
     dot: false,
   });
+  return { now: files, later: Promise.resolve([]) };
 }
 
 /**
@@ -153,15 +166,7 @@ async function processTestFile(
   return { filePath: relativeFilePath, language, layer, testCaseCount, linesOfCode, reasons };
 }
 
-export async function scanRepository(
-  rootDir: string,
-  customIgnore: string[] = [],
-  context: ClassifyContext = {},
-): Promise<ScanResult> {
-  const files = await listFiles(rootDir, customIgnore);
-
-  // Test discovery and the typed-code ratio share one file list, so --ignore
-  // and the git/glob choice can never skew one without the other.
+async function scanFiles(rootDir: string, files: string[], context: ClassifyContext) {
   const testFiles: string[] = [];
   let codeFileCount = 0;
   let typedFileCount = 0;
@@ -178,11 +183,28 @@ export async function scanRepository(
       testFiles.push(file);
     }
   }
-
   const records = (
     await poolMap(testFiles, (file) => processTestFile(rootDir, file, context))
   ).filter((r): r is TestFileRecord => r !== null);
+  return { records, codeFileCount, typedFileCount };
+}
 
+export async function scanRepository(
+  rootDir: string,
+  customIgnore: string[] = [],
+  context: ClassifyContext = {},
+): Promise<ScanResult> {
+  // Test discovery and the typed-code ratio share one file list, so --ignore
+  // and the git/glob choice can never skew one without the other.
+  const { now, later } = await listFiles(rootDir, customIgnore);
+  const batches = await Promise.all([
+    scanFiles(rootDir, now, context),
+    later.then((files) => scanFiles(rootDir, files, context)),
+  ]);
+
+  const records = batches.flatMap((b) => b.records);
+  const codeFileCount = batches.reduce((n, b) => n + b.codeFileCount, 0);
+  const typedFileCount = batches.reduce((n, b) => n + b.typedFileCount, 0);
   return {
     records,
     scannedFilesCount: records.length,
