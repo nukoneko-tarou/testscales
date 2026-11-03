@@ -235,3 +235,15 @@ describe("classifyFile runner-less E2E scripts", () => {
     expect(classifyFile("scripts/signup-journey.ts", "await run()").layer).toBe("e2e");
   });
 });
+
+describe("classifyFile import markers", () => {
+  it("does not let an import pattern span multiple statements", () => {
+    const code = `import { it } from "vitest";\nconst fixture = "import { test } from '@playwright/test'";\nit('a', () => {})`;
+    expect(classifyFile("src/fixture.test.ts", code).layer).toBe("unit");
+  });
+
+  it("still matches multi-line named imports", () => {
+    const code = `import {\n  test,\n  expect,\n} from "@playwright/test";\ntest('a', () => {})`;
+    expect(classifyFile("src/flow.test.ts", code).layer).toBe("e2e");
+  });
+});

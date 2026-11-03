@@ -68,7 +68,7 @@ const UNIT_PATH_REGEX =
 const E2E_INDICATORS = [
   {
     pattern:
-      /(?:^|\n)\s*(?:import\b[\s\S]*?from\s+['"]@playwright\/test['"]|const\b[\s\S]*?=\s*require\(['"]@playwright\/test['"]\))/i,
+      /(?:^|\n)\s*(?:import\b[^'"]*?from\s+['"]@playwright\/test['"]|const\b[^'"=]*=\s*require\(['"]@playwright\/test['"]\))/i,
     reason: "Playwright test runner import",
   },
   { pattern: /\bcy\.(?:visit|get|contains|intercept)\b/i, reason: "Cypress API commands" },
@@ -78,7 +78,7 @@ const E2E_INDICATORS = [
   },
   {
     pattern:
-      /(?:^|\n)\s*(?:import\b[\s\S]*?from\s+['"](?:puppeteer|selenium-webdriver|webdriverio|@wdio\/[a-z0-9-]+|testcafe)['"]|const\b[\s\S]*?=\s*require\(['"](?:puppeteer|selenium-webdriver|webdriverio|@wdio\/[a-z0-9-]+|testcafe)['"]\))/i,
+      /(?:^|\n)\s*(?:import\b[^'"]*?from\s+['"](?:puppeteer|selenium-webdriver|webdriverio|@wdio\/[a-z0-9-]+|testcafe)['"]|const\b[^'"=]*=\s*require\(['"](?:puppeteer|selenium-webdriver|webdriverio|@wdio\/[a-z0-9-]+|testcafe)['"]\))/i,
     reason: "Browser automation framework import",
   },
 ];
@@ -86,27 +86,27 @@ const E2E_INDICATORS = [
 const INTEGRATION_INDICATORS = [
   {
     pattern:
-      /(?:^|\n)\s*(?:import\b[\s\S]*?from\s+['"]@testing-library\/(?:react-native|react|vue|svelte|angular|dom|user-event)['"]|const\b[\s\S]*?=\s*require\(['"]@testing-library)/i,
+      /(?:^|\n)\s*(?:import\b[^'"]*?from\s+['"]@testing-library\/(?:react-native|react|vue|svelte|angular|dom|user-event)['"]|const\b[^'"=]*=\s*require\(['"]@testing-library)/i,
     reason: "Testing Library import",
   },
   {
     pattern:
-      /(?:^|\n)\s*(?:import\b[\s\S]*?from\s+['"](?:@vue\/test-utils|enzyme)['"]|const\b[\s\S]*?=\s*require\(['"](?:@vue\/test-utils|enzyme)['"]\))/i,
+      /(?:^|\n)\s*(?:import\b[^'"]*?from\s+['"](?:@vue\/test-utils|enzyme)['"]|const\b[^'"=]*=\s*require\(['"](?:@vue\/test-utils|enzyme)['"]\))/i,
     reason: "Component testing framework import",
   },
   {
     pattern:
-      /(?:^|\n)\s*(?:import\b[\s\S]*?from\s+['"](?:supertest|nock|msw(?:\/node)?)['"]|const\b[\s\S]*?=\s*require\(['"](?:supertest|nock|msw(?:\/node)?)['"]\))/i,
+      /(?:^|\n)\s*(?:import\b[^'"]*?from\s+['"](?:supertest|nock|msw(?:\/node)?)['"]|const\b[^'"=]*=\s*require\(['"](?:supertest|nock|msw(?:\/node)?)['"]\))/i,
     reason: "Network/HTTP endpoint integration tool",
   },
   {
     pattern:
-      /(?:^|\n)\s*(?:import\b[\s\S]*?from\s+['"](?:testcontainers|@testcontainers\/[a-z0-9-]+|mongodb-memory-server)['"]|const\b[\s\S]*?=\s*require\(['"](?:testcontainers|@testcontainers\/[a-z0-9-]+|mongodb-memory-server)['"]\))/i,
+      /(?:^|\n)\s*(?:import\b[^'"]*?from\s+['"](?:testcontainers|@testcontainers\/[a-z0-9-]+|mongodb-memory-server)['"]|const\b[^'"=]*=\s*require\(['"](?:testcontainers|@testcontainers\/[a-z0-9-]+|mongodb-memory-server)['"]\))/i,
     reason: "Container/DB integration setup",
   },
   {
     pattern:
-      /(?:^|\n)\s*(?:import\b[\s\S]*?from\s+['"]@pact-foundation\/pact['"]|const\b[\s\S]*?=\s*require\(['"]@pact-foundation\/pact['"]\))/i,
+      /(?:^|\n)\s*(?:import\b[^'"]*?from\s+['"]@pact-foundation\/pact['"]|const\b[^'"=]*=\s*require\(['"]@pact-foundation\/pact['"]\))/i,
     reason: "Pact contract testing import",
   },
   {
