@@ -9,6 +9,15 @@ import pkg from "../package.json" with { type: "json" };
 
 const cli = cac("testscales");
 
+function parsePercent(flag: string, value: string | number | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  const n = Number(value);
+  if (value === "" || !Number.isFinite(n) || n < 0 || n > 100) {
+    throw new Error(`--${flag} expects a number between 0 and 100, got '${value}'`);
+  }
+  return n;
+}
+
 cli
   .command("[dir]", "Weigh the testing archetype of a repository")
   .option("--json", "Output results as JSON format")
@@ -69,11 +78,10 @@ cli
             expect: options.expect,
             forbid: options.forbid,
             ci: options.ci,
-            minStatic: options.minStatic !== undefined ? Number(options.minStatic) : undefined,
-            maxE2e: options.maxE2e !== undefined ? Number(options.maxE2e) : undefined,
-            minIntegration:
-              options.minIntegration !== undefined ? Number(options.minIntegration) : undefined,
-            minUnit: options.minUnit !== undefined ? Number(options.minUnit) : undefined,
+            minStatic: parsePercent("min-static", options.minStatic),
+            maxE2e: parsePercent("max-e2e", options.maxE2e),
+            minIntegration: parsePercent("min-integration", options.minIntegration),
+            minUnit: parsePercent("min-unit", options.minUnit),
           });
         }
 
