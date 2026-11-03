@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { availableParallelism } from "node:os";
 import { extname, resolve } from "node:path";
 import { promisify } from "node:util";
+import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 import { glob } from "tinyglobby";
 import { type ClassifyContext, classifyFile } from "../classifier/heuristics.js";
 import type { TestFileRecord } from "../types.js";
@@ -166,6 +167,50 @@ async function processTestFile(
   return { filePath: relativeFilePath, language, layer, testCaseCount, linesOfCode, reasons };
 }
 
+// Classification is CPU-bound regex work, so large suites are split across worker
+// threads. A worker costs a module load (~tens of ms), so each must get enough files.
+const MIN_FILES_PER_WORKER = 200;
+const WORKER_KEY = "testscales:classify";
+
+interface WorkerJob {
+  rootDir: string;
+  files: string[];
+  context: ClassifyContext;
+}
+
+function processTestFiles(
+  rootDir: string,
+  files: string[],
+  context: ClassifyContext,
+): Promise<(TestFileRecord | null)[]> {
+  const workerCount = Math.min(
+    availableParallelism(),
+    Math.floor(files.length / MIN_FILES_PER_WORKER),
+  );
+  const inThread = () => poolMap(files, (file) => processTestFile(rootDir, file, context));
+  if (workerCount < 2) return inThread();
+
+  // Deal files round-robin so one worker does not get all the giant files of one directory.
+  const chunks = Array.from({ length: workerCount }, (_, w) =>
+    files.filter((_, i) => i % workerCount === w),
+  );
+  return Promise.all(chunks.map((chunk) => runWorker({ rootDir, files: chunk, context })))
+    .then((results) => files.map((_, i) => results[i % workerCount]![Math.floor(i / workerCount)]!))
+    .catch(inThread); // e.g. a runtime that cannot load this module as a worker
+}
+
+function runWorker(job: WorkerJob): Promise<(TestFileRecord | null)[]> {
+  return new Promise((resolvePromise, reject) => {
+    // This very module is the worker entry: see the isMainThread block at the end of the file.
+    const worker = new Worker(new URL(import.meta.url), { workerData: { [WORKER_KEY]: job } });
+    worker.once("message", resolvePromise);
+    worker.once("error", reject);
+    worker.once("exit", (code) => {
+      if (code !== 0) reject(new Error(`classifier worker exited with code ${code}`));
+    });
+  });
+}
+
 async function scanFiles(rootDir: string, files: string[], context: ClassifyContext) {
   const testFiles: string[] = [];
   let codeFileCount = 0;
@@ -183,9 +228,9 @@ async function scanFiles(rootDir: string, files: string[], context: ClassifyCont
       testFiles.push(file);
     }
   }
-  const records = (
-    await poolMap(testFiles, (file) => processTestFile(rootDir, file, context))
-  ).filter((r): r is TestFileRecord => r !== null);
+  const records = (await processTestFiles(rootDir, testFiles, context)).filter(
+    (r): r is TestFileRecord => r !== null,
+  );
   return { records, codeFileCount, typedFileCount };
 }
 
@@ -211,4 +256,11 @@ export async function scanRepository(
     typedRatio: codeFileCount > 0 ? typedFileCount / codeFileCount : 1.0,
     codeFileCount,
   };
+}
+
+if (!isMainThread && workerData?.[WORKER_KEY]) {
+  const { rootDir, files, context } = workerData[WORKER_KEY] as WorkerJob;
+  void poolMap(files, (file) => processTestFile(rootDir, file, context)).then((records) =>
+    parentPort?.postMessage(records),
+  );
 }
