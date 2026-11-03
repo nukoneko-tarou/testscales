@@ -394,17 +394,20 @@ function checkCiEnforcement(rootDir: string): boolean {
     }
   }
 
-  // 2. Check pre-commit hooks
-  if (existsSync(join(rootDir, ".pre-commit-config.yaml"))) return true;
-  const huskyPreCommit = join(rootDir, ".husky", "pre-commit");
-  if (existsSync(huskyPreCommit)) {
+  // 2. Check pre-commit hooks: they only count when they actually run a static check
+  //    (a .pre-commit-config.yaml with just trailing-whitespace does not).
+  for (const hookFile of [".pre-commit-config.yaml", join(".husky", "pre-commit")]) {
     try {
-      const content = readFileSync(huskyPreCommit, "utf8");
-      if (/\b(?:lint|typecheck|tsc|oxlint|eslint|ruff|mypy|phpstan|psalm|pint)\b/i.test(content)) {
+      const content = readFileSync(join(rootDir, hookFile), "utf8");
+      if (
+        /\b(?:lint|typecheck|tsc|oxlint|eslint|biome|ruff|mypy|pyright|flake8|golangci-lint|rubocop|phpstan|psalm|pint|clippy)\b/i.test(
+          content,
+        )
+      ) {
         return true;
       }
     } catch {
-      // ignore
+      // hook file absent or unreadable
     }
   }
 

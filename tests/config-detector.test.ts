@@ -120,4 +120,18 @@ strict = true
     ]);
     expect(tools.find((t) => t.name === "TypeScript")?.isStrict).toBe(true);
   });
+
+  it("counts pre-commit only when it runs a static check", () => {
+    writeFileSync(
+      join(tempDir, ".pre-commit-config.yaml"),
+      "repos:\n  - repo: https://github.com/pre-commit/pre-commit-hooks\n    hooks:\n      - id: trailing-whitespace\n",
+    );
+    expect(detectConfigs(tempDir).hasCiEnforcement).toBe(false);
+
+    writeFileSync(
+      join(tempDir, ".pre-commit-config.yaml"),
+      "repos:\n  - repo: https://github.com/astral-sh/ruff-pre-commit\n    hooks:\n      - id: ruff\n",
+    );
+    expect(detectConfigs(tempDir).hasCiEnforcement).toBe(true);
+  });
 });
