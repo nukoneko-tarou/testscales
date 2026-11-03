@@ -247,3 +247,10 @@ describe("classifyFile import markers", () => {
     expect(classifyFile("src/flow.test.ts", code).layer).toBe("e2e");
   });
 });
+
+describe("classifyFile Rust side effects", () => {
+  it("upgrades inline Rust tests that spawn processes", () => {
+    const code = `#[cfg(test)]\nmod tests {\n  #[test]\n  fn runs() { Command::new("ls").status().unwrap(); }\n}`;
+    expect(classifyFile("src/cli.rs", code).layer).toBe("integration");
+  });
+});

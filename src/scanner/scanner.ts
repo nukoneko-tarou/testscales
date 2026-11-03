@@ -47,7 +47,7 @@ const TEST_FILE_REGEX = new RegExp(
     `(?:^|\\/)__tests__\\/.*(?<!\\.d)\\.(?:[jt]sx?|mjs|cjs)|` +
     // 6. Special test DSLs / BDD / Rust
     `\\.feature(?:\\.md)?|` +
-    `[._-]test\\.rs|` +
+    `[._-]test\\.rs|(?:^|\\/)tests\\/[^\\/]+\\.rs|` +
     // 7. Runner-less E2E scripts (scripts/*journey*)
     `(?:^|\\/)scripts\\/[^\\/]*journey[^\\/]*\\.(?:[jt]s|mjs|cjs|sh|py|rb|php|go)` +
     `)$`,
@@ -124,16 +124,25 @@ export interface ScanResult {
   codeFileCount?: number;
 }
 
+const RUST_INLINE_TEST_MARKER = "#[cfg(test)]";
+
 async function processTestFile(
   rootDir: string,
   relativeFilePath: string,
   context: ClassifyContext,
-): Promise<TestFileRecord> {
+): Promise<TestFileRecord | null> {
   let content = "";
   try {
     content = await readFile(resolve(rootDir, relativeFilePath), "utf-8");
   } catch {
     content = "";
+  }
+
+  // Rust keeps unit tests inline in production files: only the #[cfg(test)] part is a test.
+  if (/\.rs$/i.test(relativeFilePath) && !isTestFile(relativeFilePath)) {
+    const markerIndex = content.indexOf(RUST_INLINE_TEST_MARKER);
+    if (markerIndex === -1) return null;
+    content = content.slice(markerIndex);
   }
 
   const { layer, language, testCaseCount, linesOfCode, reasons } = classifyFile(
@@ -164,12 +173,13 @@ export async function scanRepository(
     } else if (UNTYPED_EXTENSIONS.has(ext)) {
       codeFileCount++;
     }
-    if (isTestFile(file)) testFiles.push(file);
+    // .rs files are candidates for inline #[cfg(test)] modules; processTestFile drops the rest.
+    if (isTestFile(file) || ext === ".rs") testFiles.push(file);
   }
 
-  const records: TestFileRecord[] = await poolMap(testFiles, (file) =>
-    processTestFile(rootDir, file, context),
-  );
+  const records = (
+    await poolMap(testFiles, (file) => processTestFile(rootDir, file, context))
+  ).filter((r): r is TestFileRecord => r !== null);
 
   return {
     records,

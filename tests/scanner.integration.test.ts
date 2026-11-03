@@ -125,4 +125,23 @@ describe("scanRepository file discovery", () => {
       expect(result.typedRatio).toBe(0.75);
     }
   });
+
+  it("discovers Cargo integration tests and inline #[cfg(test)] modules", async () => {
+    mkdirSync(join(tempDir, "src"), { recursive: true });
+    mkdirSync(join(tempDir, "tests"), { recursive: true });
+    writeFileSync(
+      join(tempDir, "src/lib.rs"),
+      `pub fn add(a: i32, b: i32) -> i32 { a + b }\n\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn adds() {}\n    #[test]\n    fn adds_negative() {}\n}`,
+    );
+    writeFileSync(join(tempDir, "src/main.rs"), `fn main() {}`);
+    writeFileSync(join(tempDir, "tests/cli.rs"), `#[test]\nfn runs() {}`);
+
+    const { records } = await scanRepository(tempDir);
+    const byPath = Object.fromEntries(records.map((r) => [r.filePath, r]));
+    expect(Object.keys(byPath).sort()).toEqual(["src/lib.rs", "sum.test.ts", "tests/cli.rs"]);
+    expect(byPath["src/lib.rs"]?.layer).toBe("unit");
+    expect(byPath["src/lib.rs"]?.testCaseCount).toBe(2);
+    expect(byPath["src/lib.rs"]?.linesOfCode).toBe(7);
+    expect(byPath["tests/cli.rs"]?.layer).toBe("integration");
+  });
 });

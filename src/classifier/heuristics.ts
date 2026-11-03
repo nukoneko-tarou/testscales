@@ -3,9 +3,16 @@ import { goClassifier } from "./languages/go.js";
 import { phpClassifier } from "./languages/php.js";
 import { pythonClassifier } from "./languages/python.js";
 import { rubyClassifier } from "./languages/ruby.js";
+import { rustClassifier } from "./languages/rust.js";
 import { analyzeStorybook, isStorybookFile } from "./storybook.js";
 
-const LANGUAGE_CLASSIFIERS = [pythonClassifier, goClassifier, rubyClassifier, phpClassifier];
+const LANGUAGE_CLASSIFIERS = [
+  pythonClassifier,
+  goClassifier,
+  rubyClassifier,
+  phpClassifier,
+  rustClassifier,
+];
 
 export interface ClassifyContext {
   hasPlaywright?: boolean;
@@ -164,6 +171,14 @@ const SIDE_EFFECT_INDICATORS: Record<string, { pattern: RegExp; reason: string }
       pattern: /\bOpen3\.\w+|\bIO\.popen\b|(?<![.\w])(?:system|spawn)\s*\(/,
       reason: PROC_REASON,
     },
+  ],
+  Rust: [
+    {
+      pattern:
+        /\btempfile::|\b(?:TempDir|NamedTempFile)::new\b|\bfs::write\s*\(|\bFile::create\s*\(/,
+      reason: FS_REASON,
+    },
+    { pattern: /\bCommand::new\s*\(/, reason: PROC_REASON },
   ],
   PHP: [
     {
@@ -345,7 +360,7 @@ function classifyLayer(
   const fastPath = classifyByPathOnly(filePath, context);
   if (fastPath) return fastPath;
 
-  // 2. Multi-language classifiers (Python, Go, Ruby, PHP)
+  // 2. Multi-language classifiers (Python, Go, Ruby, PHP, Rust)
   for (const classifier of LANGUAGE_CLASSIFIERS) {
     if (classifier.supports(filePath)) {
       const langResult = classifier.classify(filePath, content);
