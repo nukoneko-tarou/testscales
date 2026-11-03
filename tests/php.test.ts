@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { classifyFile, countTestCases, detectFileLanguage } from "../src/classifier/heuristics.js";
 import { detectConfigs } from "../src/scanner/config-detector.js";
-import { TEST_FILE_PATTERNS } from "../src/scanner/scanner.js";
+import { isTestFile } from "../src/scanner/scanner.js";
 
 describe("PHP Test Classification & Static Defense (Laravel, CakePHP, Symfony, Pest, PHPUnit)", () => {
   describe("Language Detection", () => {
@@ -298,9 +298,10 @@ it('can fetch profile', function () {
   });
 
   describe("File Patterns", () => {
-    it("includes PHP patterns in TEST_FILE_PATTERNS", () => {
-      expect(TEST_FILE_PATTERNS).toContain("**/*Test.php");
-      expect(TEST_FILE_PATTERNS).toContain("**/*[-._]{test,spec}*.php");
+    it("recognizes PHPUnit and Pest file names as tests", () => {
+      expect(isTestFile("tests/Unit/UserTest.php")).toBe(true);
+      expect(isTestFile("tests/Feature/user.test.php")).toBe(true);
+      expect(isTestFile("app/Models/User.php")).toBe(false);
     });
   });
 });

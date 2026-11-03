@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { availableParallelism } from "node:os";
-import { resolve } from "node:path";
+import { extname, resolve } from "node:path";
 import { promisify } from "node:util";
 import { glob } from "tinyglobby";
 import { type ClassifyContext, classifyFile } from "../classifier/heuristics.js";
@@ -24,36 +24,8 @@ export const DEFAULT_IGNORE_PATTERNS = [
   "**/.turbo/**",
   "**/.cache/**",
   "**/target/**", // Rust build
-  "**/__snapshots__/**",
-  "**/__mocks__/**",
-  "**/fixtures/**",
-  "**/dummy/**", // Rails engine test dummy apps
-  "**/stubs/**", // Test stubs
-  "**/test-utils/**",
-  "**/test_utils/**",
-  "**/test/common/**", // Node.js core test helpers
-  "**/tests/common/**",
-  "**/test-setup.*", // Test runner bootstrap files
-  "**/test_setup.*",
-];
-
-export const TEST_FILE_PATTERNS = [
-  "**/*[-._]{test,spec}*.{js,jsx,ts,tsx,mjs,cjs}",
-  "**/test/**/{test,spec}[-_]*.{js,jsx,ts,tsx,mjs,cjs}",
-  "**/tests/**/{test,spec}[-_]*.{js,jsx,ts,tsx,mjs,cjs}",
-  "**/__tests__/**/*.{js,jsx,ts,tsx,mjs,cjs}",
-  "**/*.cy.{js,jsx,ts,tsx}",
-  "**/*.stories.{js,jsx,ts,tsx}",
-  "**/*_test.go",
-  "**/*_{test,spec}.rb",
-  "**/test_*.py",
-  "**/*_test.py",
-  "**/*Test.php",
-  "**/*[-._]{test,spec}*.php",
-  "**/test_*.php",
-  "**/*.feature",
-  "**/*.feature.md",
-  "**/scripts/*journey*.{js,ts,mjs,cjs,sh,py,rb,php,go}",
+  // Test helpers (fixtures, __mocks__, test-setup.*, ...) are excluded by TEST_IGNORE_REGEX,
+  // not here, so they still count towards the typed-code ratio like they do via git.
 ];
 
 const TEST_IGNORE_REGEX =
@@ -82,73 +54,35 @@ const TEST_FILE_REGEX = new RegExp(
   "i",
 );
 
-interface GitDiscoveryResult {
-  testFiles: string[];
-  typedRatio: number;
-  codeFileCount: number;
+export function isTestFile(relativePath: string): boolean {
+  return !TEST_IGNORE_REGEX.test(relativePath) && TEST_FILE_REGEX.test(relativePath);
 }
 
+const TYPED_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".go", ".rs"]);
+const UNTYPED_EXTENSIONS = new Set([".js", ".jsx", ".mjs", ".cjs", ".py", ".rb", ".php"]);
+
 /**
- * Fast-track: Git index enumeration bypasses recursive filesystem readdirs.
- * Scans 100k+ tracked files in milliseconds. Falls back to tinyglobby if not a git repo.
+ * Lists candidate files. The git index is the fast path (bypasses recursive readdir and
+ * honours .gitignore); tinyglobby is the fallback outside git or when --ignore globs are given.
  */
-async function discoverFilesViaGit(rootDir: string): Promise<GitDiscoveryResult | null> {
-  try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["ls-files", "--cached", "--others", "--exclude-standard"],
-      {
-        cwd: rootDir,
-        maxBuffer: 50 * 1024 * 1024,
-      },
-    );
-
-    const lines = stdout.split("\n");
-    const testFiles: string[] = [];
-    let totalCodeFiles = 0;
-    let typedCodeFiles = 0;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]?.trim();
-      if (!line) continue;
-
-      // Measure code file typing ratio (TS, Go, Rust vs JS, Python, Ruby, PHP)
-      const dotIdx = line.lastIndexOf(".");
-      if (dotIdx !== -1) {
-        const ext = line.slice(dotIdx).toLowerCase();
-        if (
-          ext === ".ts" ||
-          ext === ".tsx" ||
-          ext === ".mts" ||
-          ext === ".cts" ||
-          ext === ".go" ||
-          ext === ".rs"
-        ) {
-          totalCodeFiles++;
-          typedCodeFiles++;
-        } else if (
-          ext === ".js" ||
-          ext === ".jsx" ||
-          ext === ".mjs" ||
-          ext === ".cjs" ||
-          ext === ".py" ||
-          ext === ".rb" ||
-          ext === ".php"
-        ) {
-          totalCodeFiles++;
-        }
-      }
-
-      if (!TEST_IGNORE_REGEX.test(line) && TEST_FILE_REGEX.test(line)) {
-        testFiles.push(line);
-      }
+async function listFiles(rootDir: string, customIgnore: string[]): Promise<string[]> {
+  if (customIgnore.length === 0) {
+    try {
+      const { stdout } = await execFileAsync(
+        "git",
+        ["ls-files", "--cached", "--others", "--exclude-standard"],
+        { cwd: rootDir, maxBuffer: 50 * 1024 * 1024 },
+      );
+      return stdout.split("\n").filter(Boolean);
+    } catch {
+      // not a git repository: fall through to glob
     }
-
-    const typedRatio = totalCodeFiles > 0 ? typedCodeFiles / totalCodeFiles : 1.0;
-    return { testFiles, typedRatio, codeFileCount: totalCodeFiles };
-  } catch {
-    return null;
   }
+  return glob("**/*", {
+    cwd: rootDir,
+    ignore: [...DEFAULT_IGNORE_PATTERNS, ...customIgnore],
+    dot: false,
+  });
 }
 
 /**
@@ -215,41 +149,32 @@ export async function scanRepository(
   customIgnore: string[] = [],
   context: ClassifyContext = {},
 ): Promise<ScanResult> {
-  let uniqueFiles: string[] = [];
-  let typedRatio = 1.0;
-  let codeFileCount: number | undefined;
+  const files = await listFiles(rootDir, customIgnore);
 
-  // 1. Try Git Index Fast-Track first (10x faster on monorepos)
-  if (customIgnore.length === 0) {
-    const gitResult = await discoverFilesViaGit(rootDir);
-    if (gitResult !== null) {
-      uniqueFiles = gitResult.testFiles;
-      typedRatio = gitResult.typedRatio;
-      codeFileCount = gitResult.codeFileCount;
+  // Test discovery and the typed-code ratio share one file list, so --ignore
+  // and the git/glob choice can never skew one without the other.
+  const testFiles: string[] = [];
+  let codeFileCount = 0;
+  let typedFileCount = 0;
+  for (const file of files) {
+    const ext = extname(file).toLowerCase();
+    if (TYPED_EXTENSIONS.has(ext)) {
+      codeFileCount++;
+      typedFileCount++;
+    } else if (UNTYPED_EXTENSIONS.has(ext)) {
+      codeFileCount++;
     }
+    if (isTestFile(file)) testFiles.push(file);
   }
 
-  // 2. Fallback to tinyglobby if not a git repository or custom ignore specified
-  if (uniqueFiles.length === 0) {
-    const ignore = [...DEFAULT_IGNORE_PATTERNS, ...customIgnore];
-    const files = await glob(TEST_FILE_PATTERNS, {
-      cwd: rootDir,
-      ignore,
-      absolute: false,
-      dot: false,
-    });
-    uniqueFiles = Array.from(new Set(files));
-  }
-
-  // 3. Process files through concurrent worker pool
-  const records: TestFileRecord[] = await poolMap(uniqueFiles, (file) =>
+  const records: TestFileRecord[] = await poolMap(testFiles, (file) =>
     processTestFile(rootDir, file, context),
   );
 
   return {
     records,
     scannedFilesCount: records.length,
-    typedRatio,
-    ...(codeFileCount !== undefined ? { codeFileCount } : {}),
+    typedRatio: codeFileCount > 0 ? typedFileCount / codeFileCount : 1.0,
+    codeFileCount,
   };
 }

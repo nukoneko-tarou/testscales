@@ -107,4 +107,22 @@ describe("scanRepository file discovery", () => {
       expect(records.some((r) => r.filePath === "scripts/build.ts")).toBe(false);
     }
   });
+
+  it("discovers the same files and typed ratio via git, glob and --ignore", async () => {
+    mkdirSync(join(tempDir, "src"), { recursive: true });
+    writeFileSync(join(tempDir, "src/legacy.js"), `module.exports = 1`);
+    writeFileSync(join(tempDir, "parser_test.rs"), `#[test]\nfn parses() {}`);
+    const expectedFiles = ["parser_test.rs", "sum.test.ts"];
+
+    const viaGlob = await scanRepository(tempDir);
+    const viaIgnore = await scanRepository(tempDir, ["nothing/**"]);
+    execFileSync("git", ["init", "-q"], { cwd: tempDir });
+    const viaGit = await scanRepository(tempDir);
+
+    for (const result of [viaGlob, viaIgnore, viaGit]) {
+      expect(result.records.map((r) => r.filePath).sort()).toEqual(expectedFiles);
+      expect(result.codeFileCount).toBe(4);
+      expect(result.typedRatio).toBe(0.75);
+    }
+  });
 });
