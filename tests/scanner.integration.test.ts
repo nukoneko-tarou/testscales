@@ -93,4 +93,18 @@ describe("scanRepository file discovery", () => {
     const viaGit = await scanRepository(tempDir);
     expect(viaGit.records.map((r) => r.filePath).sort()).toEqual(expected);
   });
+
+  it("discovers runner-less journey scripts as E2E", async () => {
+    mkdirSync(join(tempDir, "scripts"), { recursive: true });
+    writeFileSync(join(tempDir, "scripts/signup-journey.ts"), `await run()`);
+    writeFileSync(join(tempDir, "scripts/build.ts"), `build()`);
+
+    for (const init of [false, true]) {
+      if (init) execFileSync("git", ["init", "-q"], { cwd: tempDir });
+      const { records } = await scanRepository(tempDir);
+      const journey = records.find((r) => r.filePath === "scripts/signup-journey.ts");
+      expect(journey?.layer).toBe("e2e");
+      expect(records.some((r) => r.filePath === "scripts/build.ts")).toBe(false);
+    }
+  });
 });

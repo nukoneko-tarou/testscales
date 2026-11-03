@@ -53,6 +53,7 @@ export const TEST_FILE_PATTERNS = [
   "**/test_*.php",
   "**/*.feature",
   "**/*.feature.md",
+  "**/scripts/*journey*.{js,ts,mjs,cjs,sh,py,rb,php,go}",
 ];
 
 const TEST_IGNORE_REGEX =
@@ -74,7 +75,9 @@ const TEST_FILE_REGEX = new RegExp(
     `(?:^|\\/)__tests__\\/.*(?<!\\.d)\\.(?:[jt]sx?|mjs|cjs)|` +
     // 6. Special test DSLs / BDD / Rust
     `\\.feature(?:\\.md)?|` +
-    `[._-]test\\.rs` +
+    `[._-]test\\.rs|` +
+    // 7. Runner-less E2E scripts (scripts/*journey*)
+    `(?:^|\\/)scripts\\/[^\\/]*journey[^\\/]*\\.(?:[jt]s|mjs|cjs|sh|py|rb|php|go)` +
     `)$`,
   "i",
 );

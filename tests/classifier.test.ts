@@ -229,3 +229,9 @@ describe("side-effect upgrade applies to every language and to unit paths", () =
     expect(classifyFile("src/flow.test.ts", pw).layer).toBe("e2e");
   });
 });
+
+describe("classifyFile runner-less E2E scripts", () => {
+  it("classifies scripts/*journey* as E2E", () => {
+    expect(classifyFile("scripts/signup-journey.ts", "await run()").layer).toBe("e2e");
+  });
+});

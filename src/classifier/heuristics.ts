@@ -56,7 +56,7 @@ export function detectFileLanguage(filePath: string): string {
 
 // 1. Path Regex Patterns
 const E2E_PATH_REGEX =
-  /(?:^|\/)(?:e2e|cypress|playwright|tests?\/e2e|specs?\/e2e|specs?\/smoke|tests?\/smoke)(?:\/|$)|(?:\.|\/)(?:e2e|system|smoke)[._-](?:test|spec)\.[a-zA-Z0-9]+$|\.cy\.[a-zA-Z0-9]+$|\.feature(?:\.md)?$/i;
+  /(?:^|\/)(?:e2e|cypress|playwright|tests?\/e2e|specs?\/e2e|specs?\/smoke|tests?\/smoke)(?:\/|$)|(?:\.|\/)(?:e2e|system|smoke)[._-](?:test|spec)\.[a-zA-Z0-9]+$|\.cy\.[a-zA-Z0-9]+$|\.feature(?:\.md)?$|(?:^|\/)scripts\/[^/]*journey[^/]*$/i;
 
 const INTEGRATION_PATH_REGEX =
   /(?:^|\/)(?:integration|int|tests?\/integration|specs?\/integration|contract)(?:\/|$)|(?:\.|\/)(?:integration|int|component|contract|api)[._-](?:test|spec)\.[a-zA-Z0-9]+$/i;
