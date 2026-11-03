@@ -147,3 +147,10 @@ describe("Multi-language Test Classification (SOLID Open/Closed Architecture)", 
     });
   });
 });
+
+describe("JS/TS markers stay out of other languages", () => {
+  it("does not read HTML in a Ruby string as JSX component rendering", () => {
+    const code = `def test_link\n  assert_dom_equal %(<a href="/">Home</a>), link_to("Home", "/")\nend`;
+    expect(classifyFile("actionview/test/template/url_helper_test.rb", code).layer).toBe("unit");
+  });
+});

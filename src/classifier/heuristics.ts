@@ -375,16 +375,19 @@ function classifyLayer(
   const fastPath = classifyByPathOnly(filePath, context);
   if (fastPath) return fastPath;
 
-  // 2. Multi-language classifiers (Python, Go, Ruby, PHP, Rust)
-  for (const classifier of LANGUAGE_CLASSIFIERS) {
-    if (classifier.supports(filePath)) {
-      const langResult = classifier.classify(filePath, content);
-      if (langResult) return langResult;
-      break;
-    }
+  // 2. Multi-language classifiers (Python, Go, Ruby, PHP, Rust). Their files never fall
+  //    through to the JS/TS markers below, which would read HTML in strings as JSX.
+  const classifier = LANGUAGE_CLASSIFIERS.find((c) => c.supports(filePath));
+  if (classifier) {
+    return (
+      classifier.classify(filePath, content) ?? {
+        layer: "unit",
+        reasons: [`No ${classifier.language} integration or E2E markers`],
+      }
+    );
   }
 
-  // 3. Content-based heuristic classification
+  // 3. Content-based heuristic classification (JS/TS)
   for (const indicator of E2E_INDICATORS) {
     if (matchesIndicator(indicator, content)) return { layer: "e2e", reasons: [indicator.reason] };
   }
