@@ -1,4 +1,20 @@
 import type { ArchetypeType, ScaleResult } from "../types.js";
+import { ARCHETYPES } from "./archetypes.js";
+
+function parseArchetypes(flag: string, list: string): ArchetypeType[] {
+  const names = list
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  const known = Object.keys(ARCHETYPES);
+  const unknown = names.filter((n) => !known.includes(n));
+  if (unknown.length > 0) {
+    throw new Error(
+      `--${flag} got unknown archetype(s): ${unknown.join(", ")}. Valid: ${known.join(", ")}`,
+    );
+  }
+  return names as ArchetypeType[];
+}
 
 export interface CiAssertOptions {
   assert?: string; // e.g. "trophy" or "trophy,diamond"
@@ -33,10 +49,7 @@ export function evaluateCiAssertions(
   // 1. --assert / --expect: Expected allowed archetypes
   const allowedStr = options.assert || options.expect;
   if (allowedStr) {
-    const allowed = allowedStr
-      .split(",")
-      .map((s) => s.trim().toLowerCase() as ArchetypeType)
-      .filter(Boolean);
+    const allowed = parseArchetypes(options.assert ? "assert" : "expect", allowedStr);
 
     if (allowed.length > 0 && !allowed.includes(actualType)) {
       failures.push({
@@ -52,12 +65,7 @@ export function evaluateCiAssertions(
   const forbidStr = options.forbid;
   const forbidden: ArchetypeType[] = [];
   if (forbidStr) {
-    forbidden.push(
-      ...forbidStr
-        .split(",")
-        .map((s) => s.trim().toLowerCase() as ArchetypeType)
-        .filter(Boolean),
-    );
+    forbidden.push(...parseArchetypes("forbid", forbidStr));
   }
   // In default --ci mode without explicit assert, forbid void automatically
   if (options.ci && !forbidStr && !allowedStr) {

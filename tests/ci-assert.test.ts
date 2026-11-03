@@ -97,6 +97,16 @@ describe("evaluateCiAssertions", () => {
       );
       expect(evaluation.failures[0]?.actual).toBe("ice-cream-cone");
     });
+
+    it("rejects unknown archetype names instead of failing every run", () => {
+      const result = createMockScaleResult("trophy");
+      expect(() => evaluateCiAssertions(result, { assert: "trophee" })).toThrow(
+        "--assert got unknown archetype(s): trophee",
+      );
+      expect(() => evaluateCiAssertions(result, { forbid: "void,icecream" })).toThrow(
+        "--forbid got unknown archetype(s): icecream",
+      );
+    });
   });
 
   describe("--forbid", () => {
