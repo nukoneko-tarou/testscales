@@ -117,7 +117,8 @@ const INTEGRATION_INDICATORS = [
     reason: "Pact contract testing import",
   },
   {
-    pattern: /\brender\s*\(|<[A-Za-z][A-Za-z0-9]*(?:\s[^<>]*)?\/>|<\/[A-Za-z][A-Za-z0-9]*>/i,
+    pattern:
+      /(?<![.\w$])render\s*\(|<[A-Za-z][A-Za-z0-9]*(?:\s[^<>]*)?\/>|<\/[A-Za-z][A-Za-z0-9]*>/i,
     reason: "Component DOM rendering API",
   },
   { pattern: /\bscreen\.(?:getBy|findBy|queryBy)[A-Za-z]+\s*\(/i, reason: "DOM screen queries" },

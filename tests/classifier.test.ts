@@ -254,3 +254,16 @@ describe("classifyFile Rust side effects", () => {
     expect(classifyFile("src/cli.rs", code).layer).toBe("integration");
   });
 });
+
+describe("classifyFile component render marker", () => {
+  it("treats a bare render() call as component rendering", () => {
+    expect(classifyFile("src/card.test.ts", `it('a', () => { render(Card) })`).layer).toBe(
+      "integration",
+    );
+  });
+
+  it("ignores render methods on other objects", () => {
+    const code = `it('formats', () => { expect(template.render({ name: 'x' })).toBe('x') })`;
+    expect(classifyFile("src/template.test.ts", code).layer).toBe("unit");
+  });
+});
