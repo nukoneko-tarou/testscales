@@ -184,7 +184,7 @@ describe("classifyFile side-effect detection", () => {
       it('scans', async () => { const dir = await mkdtemp('x'); await writeFile(dir + '/a', '') })
     `;
     expect(classifyFile("src/scan.test.ts", fsTest).layer).toBe("integration");
-    const spawnTest = `it('runs cli', () => { spawnSync('node', ['cli.js']) })`;
+    const spawnTest = `import { spawnSync } from 'node:child_process'\nit('runs cli', () => { spawnSync('node', ['cli.js']) })`;
     expect(classifyFile("src/cli.test.ts", spawnTest).layer).toBe("integration");
     expect(classifyFile("src/re.test.ts", `it('m', () => { /a/.exec('a') })`).layer).toBe("unit");
   });
@@ -192,7 +192,10 @@ describe("classifyFile side-effect detection", () => {
 
 describe("side-effect upgrade applies to every language and to unit paths", () => {
   const cases: [string, string][] = [
-    ["tests/unit/cli.test.ts", `it('runs', () => { execFileSync('node', ['cli.js']) })`],
+    [
+      "tests/unit/cli.test.ts",
+      `const { execFileSync } = require("child_process")\nit('runs', () => { execFileSync('node', ['cli.js']) })`,
+    ],
     ["tests/test_io.py", `def test_write(tmp_path):\n    (tmp_path / 'a').write_text('x')`],
     ["tests/test_cli.py", `def test_cli():\n    subprocess.run(['ls'])`],
     ["pkg/io_test.go", `func TestWrite(t *testing.T) { dir := t.TempDir(); _ = dir }`],
@@ -265,5 +268,12 @@ describe("classifyFile component render marker", () => {
   it("ignores render methods on other objects", () => {
     const code = `it('formats', () => { expect(template.render({ name: 'x' })).toBe('x') })`;
     expect(classifyFile("src/template.test.ts", code).layer).toBe("unit");
+  });
+});
+
+describe("classifyFile redux-saga effects", () => {
+  it("keeps saga tests using fork/spawn effects as unit", () => {
+    const code = `import { fork, spawn } from 'redux-saga/effects'\nit('forks', () => { expect(gen.next().value).toEqual(fork(worker)); spawn(other) })`;
+    expect(classifyFile("src/saga.test.ts", code).layer).toBe("unit");
   });
 });

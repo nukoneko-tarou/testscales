@@ -128,14 +128,15 @@ const INTEGRATION_INDICATORS = [
 // integration regardless of path. Applied per language; only ever upgrades unit → integration.
 const FS_REASON = "Real filesystem I/O (temp dir / file write)";
 const PROC_REASON = "Child process execution";
+// Child processes are detected by their module, not bare spawn()/fork() calls, which
+// redux-saga also exports as pure effect creators.
 const JS_SIDE_EFFECTS = [
   {
     pattern: /\bmkdtemp(?:Sync)?\s*\(|\b(?:writeFile|appendFile)(?:Sync)?\s*\(/,
     reason: FS_REASON,
   },
   {
-    pattern:
-      /(?<![.\w])(?:spawn|spawnSync|exec|execSync|execFile|execFileSync|execa|fork)\s*\(|\bBun\.spawn(?:Sync)?\s*\(|\bchild_process\.\w+\s*\(/,
+    pattern: /['"](?:node:)?child_process['"]|['"]execa['"]|\bBun\.spawn(?:Sync)?\s*\(/,
     reason: PROC_REASON,
   },
 ];
