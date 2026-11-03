@@ -148,6 +148,9 @@ jobs:
 * **Python**: `pytest`, `unittest`, Django Test Client, FastAPI / Starlette `TestClient`, Playwright-Python, Selenium
 * **Go**: `testing`, `net/http/httptest`, `testcontainers-go`, `chromedp`, `testify/mock`, `gomock`
 * **Ruby**: RSpec, Rails System/Feature Specs (Capybara), Request/API Specs, VCR, WebMock, Model Specs
+* **Rust**: inline `#[cfg(test)]` modules (Unit), Cargo `tests/*.rs` crates (Integration), Clippy
+
+In every language, a test that touches the real filesystem (temp directories, file writes) or spawns child processes counts as **Integration**, even under a `unit/` path. Runner-less journey scripts (`scripts/*journey*`) count as **E2E**. Static tool configs are detected at the root and in workspace packages up to two levels deep (`packages/*`, `apps/*`, ...).
 
 ---
 
