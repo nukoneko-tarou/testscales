@@ -71,12 +71,25 @@ const INTEGRATION_PATH_REGEX =
 const UNIT_PATH_REGEX =
   /(?:^|\/)(?:unit|tests?\/unit|specs?\/unit|isolated)(?:\/|$)|(?:\.|\/)(?:unit|isolated)[._-](?:test|spec)\.[a-zA-Z0-9]+$/i;
 
+interface Indicator {
+  pattern: RegExp;
+  reason: string;
+  hints?: string[];
+}
+
+function matchesIndicator(indicator: Indicator, content: string): boolean {
+  if (indicator.hints && !indicator.hints.some((h) => content.includes(h))) return false;
+  return indicator.pattern.test(content);
+}
+
 // 2. Content Indicators
-const E2E_INDICATORS = [
+const E2E_INDICATORS: Indicator[] = [
   {
     pattern:
       /(?:^|\n)\s*(?:import\b[^'"]*?from\s+['"]@playwright\/test['"]|const\b[^'"=]*=\s*require\(['"]@playwright\/test['"]\))/i,
     reason: "Playwright test runner import",
+    // Module names are lowercase, so a plain substring check can skip the regex scan.
+    hints: ["@playwright/test"],
   },
   { pattern: /\bcy\.(?:visit|get|contains|intercept)\b/i, reason: "Cypress API commands" },
   {
@@ -87,34 +100,40 @@ const E2E_INDICATORS = [
     pattern:
       /(?:^|\n)\s*(?:import\b[^'"]*?from\s+['"](?:puppeteer|selenium-webdriver|webdriverio|@wdio\/[a-z0-9-]+|testcafe)['"]|const\b[^'"=]*=\s*require\(['"](?:puppeteer|selenium-webdriver|webdriverio|@wdio\/[a-z0-9-]+|testcafe)['"]\))/i,
     reason: "Browser automation framework import",
+    hints: ["puppeteer", "selenium-webdriver", "webdriverio", "@wdio/", "testcafe"],
   },
 ];
 
-const INTEGRATION_INDICATORS = [
+const INTEGRATION_INDICATORS: Indicator[] = [
   {
     pattern:
       /(?:^|\n)\s*(?:import\b[^'"]*?from\s+['"]@testing-library\/(?:react-native|react|vue|svelte|angular|dom|user-event)['"]|const\b[^'"=]*=\s*require\(['"]@testing-library)/i,
     reason: "Testing Library import",
+    hints: ["@testing-library"],
   },
   {
     pattern:
       /(?:^|\n)\s*(?:import\b[^'"]*?from\s+['"](?:@vue\/test-utils|enzyme)['"]|const\b[^'"=]*=\s*require\(['"](?:@vue\/test-utils|enzyme)['"]\))/i,
     reason: "Component testing framework import",
+    hints: ["@vue/test-utils", "enzyme"],
   },
   {
     pattern:
       /(?:^|\n)\s*(?:import\b[^'"]*?from\s+['"](?:supertest|nock|msw(?:\/node)?)['"]|const\b[^'"=]*=\s*require\(['"](?:supertest|nock|msw(?:\/node)?)['"]\))/i,
     reason: "Network/HTTP endpoint integration tool",
+    hints: ["supertest", "nock", "msw"],
   },
   {
     pattern:
       /(?:^|\n)\s*(?:import\b[^'"]*?from\s+['"](?:testcontainers|@testcontainers\/[a-z0-9-]+|mongodb-memory-server)['"]|const\b[^'"=]*=\s*require\(['"](?:testcontainers|@testcontainers\/[a-z0-9-]+|mongodb-memory-server)['"]\))/i,
     reason: "Container/DB integration setup",
+    hints: ["testcontainers", "mongodb-memory-server"],
   },
   {
     pattern:
       /(?:^|\n)\s*(?:import\b[^'"]*?from\s+['"]@pact-foundation\/pact['"]|const\b[^'"=]*=\s*require\(['"]@pact-foundation\/pact['"]\))/i,
     reason: "Pact contract testing import",
+    hints: ["@pact-foundation/pact"],
   },
   {
     pattern:
@@ -221,22 +240,16 @@ const ASSERTION_FALLBACK_PATTERNS = [
   /\bexpect\s*\(/g,
 ];
 
+// One combined alternation per group: a single scan instead of one per pattern.
+const TEST_CASE_REGEX = new RegExp(TEST_CASE_PATTERNS.map((p) => `(?:${p.source})`).join("|"), "g");
+const ASSERTION_FALLBACK_REGEX = new RegExp(
+  ASSERTION_FALLBACK_PATTERNS.map((p) => `(?:${p.source})`).join("|"),
+  "g",
+);
+
 export function countTestCases(content: string): number {
-  let count = 0;
-  for (const pattern of TEST_CASE_PATTERNS) {
-    const matches = content.match(pattern);
-    if (matches) {
-      count += matches.length;
-    }
-  }
-  if (count === 0) {
-    for (const pattern of ASSERTION_FALLBACK_PATTERNS) {
-      const matches = content.match(pattern);
-      if (matches) {
-        count += matches.length;
-      }
-    }
-  }
+  const count =
+    content.match(TEST_CASE_REGEX)?.length || content.match(ASSERTION_FALLBACK_REGEX)?.length || 0;
   return Math.max(count, 1);
 }
 
@@ -373,11 +386,11 @@ function classifyLayer(
 
   // 3. Content-based heuristic classification
   for (const indicator of E2E_INDICATORS) {
-    if (indicator.pattern.test(content)) return { layer: "e2e", reasons: [indicator.reason] };
+    if (matchesIndicator(indicator, content)) return { layer: "e2e", reasons: [indicator.reason] };
   }
 
   for (const indicator of INTEGRATION_INDICATORS) {
-    if (indicator.pattern.test(content)) {
+    if (matchesIndicator(indicator, content)) {
       return { layer: "integration", reasons: [indicator.reason] };
     }
   }
