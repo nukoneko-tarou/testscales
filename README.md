@@ -33,12 +33,12 @@ Tested across major open-source codebases, completing analysis in milliseconds:
 
 | Codebase | Total Files in Repo | Tests Analyzed | Scan Time | Verdict |
 | :--- | :---: | :---: | :---: | :--- |
-| **Node.js Runtime** (`nodejs/node`) | **51,960 files** | **48,884 tests** (6,278 files) | **1.9 s** ⚡ | 🗡️ The Monolith Spike |
-| **Laravel Framework** (`laravel/framework`) | 3,424 files | **13,297 tests** (997 files) | **326 ms** ⚡ | 🔺 The Classic Pyramid |
-| **Ruby on Rails** (`rails/rails`) | 5,017 files | **18,347 tests** (1,314 files) | **526 ms** ⚡ | 🔺 The Classic Pyramid |
-| **React** (`facebook/react`) | 7,252 files | **6,475 tests** (521 files) | **2.3 s** | 🏆 The Testing Trophy |
-| **FastAPI** (`fastapi/fastapi`) | 3,139 files | **2,328 tests** (509 files) | **159 ms** ⚡ | 🏆 The Testing Trophy |
-| **Gin Web Framework** (`gin-gonic/gin`) | 130 files | **648 tests** (40 files) | **22 ms** ⚡ | 🏆 The Testing Trophy |
+| **Node.js Runtime** (`nodejs/node`) | **56,780 files** | **50,394 tests** (6,405 files) | **248 ms** ⚡ | 🔺 The Classic Pyramid |
+| **Laravel Framework** (`laravel/framework`) | 3,494 files | **13,787 tests** (1,017 files) | **73 ms** ⚡ | 🔺 The Classic Pyramid |
+| **Ruby on Rails** (`rails/rails`) | 5,022 files | **18,803 tests** (1,323 files) | **85 ms** ⚡ | 🔺 The Classic Pyramid |
+| **React** (`facebook/react`) | 7,300 files | **6,613 tests** (538 files) | **108 ms** ⚡ | 🏆 The Testing Trophy |
+| **FastAPI** (`fastapi/fastapi`) | 3,235 files | **2,782 tests** (558 files) | **69 ms** ⚡ | 🏆 The Testing Trophy |
+| **Gin Web Framework** (`gin-gonic/gin`) | 130 files | **650 tests** (40 files) | **18 ms** ⚡ | 🏆 The Testing Trophy |
 
 ---
 
